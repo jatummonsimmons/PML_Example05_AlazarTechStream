@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include "AlazarControlThread.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -17,5 +18,7 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    AlazarControlThread dataThread;
+
 };
 #endif // MAINWINDOW_H
