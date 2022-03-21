@@ -1,6 +1,13 @@
 #include "AlazarControlThread.h"
 
-AlazarControlThread :: AlazarControlThread(QObject *parent)
+AlazarControlThread :: AlazarControlThread(QObject *parent) :
+    QThread(parent),
+    flag(false),
+    ch1_tempBuffer(256),
+    ch2_tempBuffer(256),
+    ch3_tempBuffer(256),
+    ch4_tempBuffer(256),
+    running(true)
 {
 
 
@@ -10,6 +17,7 @@ AlazarControlThread :: AlazarControlThread(QObject *parent)
 AlazarControlThread :: ~AlazarControlThread()
 {
     wait();
+    delete [] saveBuffer;
 }
 
 void AlazarControlThread::run()
@@ -111,7 +119,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_C,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_400_MV,
+                                   INPUT_RANGE_PM_2_V,
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -124,7 +132,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_D,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_400_MV,
+                                   INPUT_RANGE_PM_2_V,
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -204,17 +212,19 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
 bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 {
     // There are no pre-trigger samples in NPT mode
-    U32 preTriggerSamples = 0;
+    //U32 preTriggerSamples = 0;
+    preTriggerSamples = 0; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Select the number of post-trigger samples per record
-    U32 postTriggerSamples = 256;
+    //postTriggerSamples = 256;
+    postTriggerSamples = 256; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Specify the number of records per DMA buffer
-    U32 recordsPerBuffer = 2000;
-
+    //U32 recordsPerBuffer = 2000;
+    recordsPerBuffer = 2000; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Specify the total number of buffers to capture
-    U32 buffersPerAcquisition = 10;
+    buffersPerAcquisition = 100000;
 
     // TODO: Select which channels to capture (A, B, or both)
     U32 channelMask = CHANNEL_A | CHANNEL_B | CHANNEL_C | CHANNEL_D;
@@ -247,7 +257,14 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     U32 samplesPerRecord = preTriggerSamples + postTriggerSamples;
     U32 bytesPerRecord = (U32)(bytesPerSample * samplesPerRecord +
                                0.5); // 0.5 compensates for double to integer conversion
-    U32 bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount;
+    bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount;
+
+    // JATS CHANGE: Add in a saveBuffer which is specified as the number of buffers per acquisition * samples per buffer
+    saveBuffer = new U16[bytesPerBuffer/2*buffersPerAcquisition];
+
+    // JATS CHANGE: Add in sendEmit flag to help GUI only receive emits when it is ready
+    bool sendEmit = false;
+
 
     // Create a data file if required
     FILE *fpData = NULL;
@@ -294,13 +311,14 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     // Configure the board to make an NPT AutoDMA acquisition
     if (success)
     {
-        U32 recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition;
+        //U32 recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition;
+        U32 infiniteRecords = 0x7FFFFFFF; // Acquire until aborted or timeout. // JATS CHANGE: want infinite acquisition
 
-        //U32 admaFlags = ADMA_INTERLEAVE_SAMPLES | ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
-        U32 admaFlags = ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
+        U32 admaFlags = ADMA_INTERLEAVE_SAMPLES | ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
+        //U32 admaFlags = ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
 
         retCode = AlazarBeforeAsyncRead(boardHandle, channelMask, -(long)preTriggerSamples,
-                                        samplesPerRecord, recordsPerBuffer, recordsPerAcquisition,
+                                        samplesPerRecord, recordsPerBuffer, infiniteRecords,
                                         admaFlags);
         if (retCode != ApiSuccess)
         {
@@ -323,7 +341,6 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         }
     }
 
-
     // Arm the board system to wait for a trigger event to begin the acquisition
     if (success)
     {
@@ -339,12 +356,12 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     // the board.
     if (success)
     {
-        printf("Capturing %d buffers ... press any key to abort\n", buffersPerAcquisition);
+        //JATS CHANGE: printf("Capturing %d buffers ... press any key to abort\n", buffersPerAcquisition);
 
         U32 startTickCount = GetTickCount();
-        U32 buffersCompleted = 0;
+        buffersCompleted = 0;
         INT64 bytesTransferred = 0;
-        while (buffersCompleted < buffersPerAcquisition)
+        while (running)
         {
             // TODO: Set a buffer timeout that is longer than the time
             //       required to capture all the records in one buffer.
@@ -367,8 +384,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             {
                 // The buffer is full and has been removed from the list
                 // of buffers available for the board
-
-                buffersCompleted++;
+                {
+                    QMutexLocker locker(&mutex);
+                    buffersCompleted++;
+                }
                 bytesTransferred += bytesPerBuffer;
 
                 // TODO: Process sample data in this buffer.
@@ -390,6 +409,19 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 // - a sample code of 0x0000 represents a negative full scale input signal.
                 // - a sample code of 0x8000 represents a ~0V signal.
                 // - a sample code of 0xFFFF represents a positive full scale input signal.
+
+                // JATS CHANGE: simple version will just mutex a saveBuffer and update it
+                memmove(&saveBuffer[(buffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2],pBuffer,bytesPerBuffer);
+                {
+                    QMutexLocker locker(&mutex);
+                    sendEmit = !flag;
+                    flag = true;
+                }
+
+                if (sendEmit){
+                    emit dataReady();
+                }
+
                 if (saveData)
                 {
                     // Write record to file
@@ -419,15 +451,18 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             if (!success)
                 break;
 
+            // JATS CHANGE: removed keypress sensitivity
             // If a key was pressed, exit the acquisition loop
-            if (_kbhit())
-            {
-                printf("Aborted...\n");
-                break;
-            }
+//            if (_kbhit())
+//            {
+//                printf("Aborted...\n");
+//                break;
+//            }
 
             // Display progress
             printf("Completed %u buffers\r", buffersCompleted);
+            qDebug() << "Completed " << buffersCompleted << " buffers";
+
         }
 
         // Display results
@@ -456,7 +491,6 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         printf("Captured %u records (%.4g records per sec)\n", recordsTransferred, recordsPerSec);
         printf("Transferred %I64d bytes (%.4g bytes per sec)\n", bytesTransferred, bytesPerSec);
 
-        qDebug() << "Captured " << buffersCompleted << " buffers";
     }
 
     // Abort the acquisition
@@ -486,6 +520,34 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     return success;
 }
 
+void AlazarControlThread::readLatestData(QVector<double> *ch1, QVector<double> *ch2, QVector<double> *ch3, QVector<double> *ch4)
+{
+    U64 totalSamplesPerChannelPerRecord = preTriggerSamples + postTriggerSamples;
+    U32 tempBuffersCompleted = 0;
+    {
+        QMutexLocker locker(&mutex);
+        tempBuffersCompleted = buffersCompleted;
+        flag = false;
+    }
+
+    for (int i=0;i<totalSamplesPerChannelPerRecord;i++){
+        ch1_tempBuffer[i] = saveBuffer[i*4+0 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
+        ch2_tempBuffer[i] = saveBuffer[i*4+1 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
+        ch3_tempBuffer[i] = saveBuffer[i*4+2 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
+        ch4_tempBuffer[i] = saveBuffer[i*4+3 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
+    }
+
+
+    *ch1 = ch1_tempBuffer;
+    *ch2 = ch2_tempBuffer;
+    *ch3 = ch3_tempBuffer;
+    *ch4 = ch4_tempBuffer;
+}
+
+void AlazarControlThread::stopRunning()
+{
+    running = false;
+}
 
 #ifndef WIN32
 inline U32 GetTickCount(void)

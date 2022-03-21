@@ -49,8 +49,8 @@ class AlazarControlThread : public QThread
 public:
     AlazarControlThread(QObject *parent = nullptr);
     ~AlazarControlThread();
-
-    void readLatestData();
+    void readLatestData(QVector<double> *ch1, QVector<double> *ch2, QVector<double> *ch3, QVector<double> *ch4);
+    void stopRunning();
 
 signals:
     void dataReady();
@@ -64,6 +64,23 @@ private:
 
     U16 *BufferArray[BUFFER_COUNT] = { NULL };
     double samplesPerSec = 0.0;
+
+    U32 preTriggerSamples;
+    U32 postTriggerSamples;
+    U32 recordsPerBuffer;
+    U32 buffersPerAcquisition;
+    U32 bytesPerBuffer;
+    U32 buffersCompleted;
+
+    U16 * saveBuffer;
+    QMutex mutex;
+    bool flag;
+    QVector<double> ch1_tempBuffer;
+    QVector<double> ch2_tempBuffer;
+    QVector<double> ch3_tempBuffer;
+    QVector<double> ch4_tempBuffer;
+    bool running;
+
 
 };
 
