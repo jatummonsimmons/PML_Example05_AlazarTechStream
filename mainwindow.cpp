@@ -4,13 +4,13 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
-    ch1(256),
-    ch2(256),
-    ch3(256),
-    ch4(256),
-    x(256)
+    ch1(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES),
+    ch2(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES),
+    ch3(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES),
+    ch4(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES),
+    x(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES)
 {
-    for (int i =0;i<256;i++){
+    for (int i =0;i<PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES;i++){
         x[i] = i;
     }
     ui->setupUi(this);
@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     connect(&dataThread,&AlazarControlThread::dataReady,this, &MainWindow::updateTimeDomain);
-    dataThread.start(QThread::NormalPriority);
+    dataThread.start(QThread::HighestPriority);
 }
 
 MainWindow::~MainWindow()
@@ -60,6 +60,13 @@ void MainWindow::setupTimeDomainPlot(QCustomPlot *customPlot)
     customPlot->xAxis->setLabel("Time (Samples)");
     customPlot->yAxis->setLabel("Amplitude (ADC Units)");
 
-    customPlot->xAxis->setRange(0, 256);
-    customPlot->yAxis->setRange(32500,33000);
+    customPlot->xAxis->setRange(0, PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
+    customPlot->yAxis->setRange(-1,1);
+
+    customPlot->setInteraction(QCP::iRangeZoom,true);
+    customPlot->axisRect()->setRangeZoom(customPlot->yAxis->orientation());
+
+    customPlot->setInteraction(QCP::iRangeDrag,true);
+    customPlot->axisRect()->setRangeDrag(customPlot->yAxis->orientation());
+
 }

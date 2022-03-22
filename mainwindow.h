@@ -4,6 +4,12 @@
 #include <QMainWindow>
 #include "AlazarControlThread.h"
 #include "qcustomplot.h"
+#include "acquisitionConfig.h"
+
+
+// TODO: Add #defines for common constants (in particular data size constants) - add this and pass it to the constructor for the main window
+
+#define CONSTANT_QWJEQJIWE (2000)
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }

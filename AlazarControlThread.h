@@ -17,6 +17,8 @@
 #include "AlazarApi.h"
 #include "AlazarCmd.h"
 
+#include "acquisitionConfig.h"
+
 #ifdef _WIN32
 #include <conio.h>
 #else // ifndef _WIN32
@@ -61,24 +63,24 @@ protected:
 private:
     bool ConfigureBoard(HANDLE boardHandle);
     bool AcquireData(HANDLE boardHandle);
+    double InputRangeIdToVolts(U32 inputRangeId);
 
     U16 *BufferArray[BUFFER_COUNT] = { NULL };
     double samplesPerSec = 0.0;
+    U32 inputRange[4];
 
     U32 preTriggerSamples;
     U32 postTriggerSamples;
     U32 recordsPerBuffer;
     U32 buffersPerAcquisition;
+
     U32 bytesPerBuffer;
     U32 buffersCompleted;
+
 
     U16 * saveBuffer;
     QMutex mutex;
     bool flag;
-    QVector<double> ch1_tempBuffer;
-    QVector<double> ch2_tempBuffer;
-    QVector<double> ch3_tempBuffer;
-    QVector<double> ch4_tempBuffer;
     bool running;
 
 

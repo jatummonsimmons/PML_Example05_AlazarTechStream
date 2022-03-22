@@ -3,10 +3,6 @@
 AlazarControlThread :: AlazarControlThread(QObject *parent) :
     QThread(parent),
     flag(false),
-    ch1_tempBuffer(256),
-    ch2_tempBuffer(256),
-    ch3_tempBuffer(256),
-    ch4_tempBuffer(256),
     running(true)
 {
 
@@ -89,11 +85,12 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
 
 
     // TODO: Select channel A input parameters as required
+    inputRange[0] = INPUT_RANGE_PM_400_MV;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_A,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_400_MV,
+                                   inputRange[0],
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -102,11 +99,12 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel B input parameters as required
+    inputRange[1] = INPUT_RANGE_PM_400_MV;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_B,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_400_MV,
+                                   inputRange[1],
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -115,11 +113,12 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel C input parameters as required
+    inputRange[2] = INPUT_RANGE_PM_200_MV;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_C,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_2_V,
+                                   inputRange[2],
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -128,11 +127,12 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel D input parameters as required
+    inputRange[3] = INPUT_RANGE_PM_200_MV;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_D,
                                    DC_COUPLING,
-                                   INPUT_RANGE_PM_2_V,
+                                   inputRange[3],
                                    IMPEDANCE_50_OHM);
     if (retCode != ApiSuccess)
     {
@@ -213,24 +213,24 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 {
     // There are no pre-trigger samples in NPT mode
     //U32 preTriggerSamples = 0;
-    preTriggerSamples = 0; //JATS CHANGE: making these accessible from other functions
+    preTriggerSamples = PRE_TRIGGER_SAMPLES; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Select the number of post-trigger samples per record
     //postTriggerSamples = 256;
-    postTriggerSamples = 256; //JATS CHANGE: making these accessible from other functions
+    postTriggerSamples = POST_TRIGGER_SAMPLES; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Specify the number of records per DMA buffer
     //U32 recordsPerBuffer = 2000;
-    recordsPerBuffer = 2000; //JATS CHANGE: making these accessible from other functions
+    recordsPerBuffer = RECORDS_PER_BUFFER; //JATS CHANGE: making these accessible from other functions
 
     // TODO: Specify the total number of buffers to capture
-    buffersPerAcquisition = 100000;
+    buffersPerAcquisition = BUFFERS_PER_ACQUISITION;
 
     // TODO: Select which channels to capture (A, B, or both)
     U32 channelMask = CHANNEL_A | CHANNEL_B | CHANNEL_C | CHANNEL_D;
 
     // TODO: Select if you wish to save the sample data to a file
-    BOOL saveData = true;
+    BOOL saveData = false;
 
     // Calculate the number of enabled channels from the channel mask
     int channelCount = 0;
@@ -260,11 +260,11 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount;
 
     // JATS CHANGE: Add in a saveBuffer which is specified as the number of buffers per acquisition * samples per buffer
+
     saveBuffer = new U16[bytesPerBuffer/2*buffersPerAcquisition];
 
     // JATS CHANGE: Add in sendEmit flag to help GUI only receive emits when it is ready
     bool sendEmit = false;
-
 
     // Create a data file if required
     FILE *fpData = NULL;
@@ -308,15 +308,17 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         }
     }
 
+
+    // JATS CHANGE: Checking NPT requirements
+//    U32 retValue;
+//    retCode = AlazarQueryCapability(boardHandle,CAP_MAX_NPT_PRETRIGGER_SAMPLES,0, &retValue);
+
     // Configure the board to make an NPT AutoDMA acquisition
     if (success)
     {
         //U32 recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition;
         U32 infiniteRecords = 0x7FFFFFFF; // Acquire until aborted or timeout. // JATS CHANGE: want infinite acquisition
-
-        U32 admaFlags = ADMA_INTERLEAVE_SAMPLES | ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
-        //U32 admaFlags = ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
-
+        U32 admaFlags = ADMA_INTERLEAVE_SAMPLES | ADMA_EXTERNAL_STARTCAPTURE | ADMA_TRADITIONAL_MODE | ADMA_FIFO_ONLY_STREAMING;
         retCode = AlazarBeforeAsyncRead(boardHandle, channelMask, -(long)preTriggerSamples,
                                         samplesPerRecord, recordsPerBuffer, infiniteRecords,
                                         admaFlags);
@@ -384,11 +386,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             {
                 // The buffer is full and has been removed from the list
                 // of buffers available for the board
-                {
-                    QMutexLocker locker(&mutex);
-                    buffersCompleted++;
-                }
-                bytesTransferred += bytesPerBuffer;
+//                {
+//                    QMutexLocker locker(&mutex);
+//                    buffersCompleted++;
+//                }
 
                 // TODO: Process sample data in this buffer.
 
@@ -409,11 +410,18 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 // - a sample code of 0x0000 represents a negative full scale input signal.
                 // - a sample code of 0x8000 represents a ~0V signal.
                 // - a sample code of 0xFFFF represents a positive full scale input signal.
-
+//                if (buffersCompleted == 350){
+//                    bool pause = true;
+//                    U16 * tempBuffer = new U16[bytesPerBuffer/2];
+//                    memcpy(tempBuffer,pBuffer,bytesPerBuffer);
+//                    qDebug() << tempBuffer[1];
+//                }
                 // JATS CHANGE: simple version will just mutex a saveBuffer and update it
-                memmove(&saveBuffer[(buffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2],pBuffer,bytesPerBuffer);
+                U64 index = (buffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2;
+                memmove(&(saveBuffer[index]),pBuffer,bytesPerBuffer);
                 {
                     QMutexLocker locker(&mutex);
+                    buffersCompleted++;
                     sendEmit = !flag;
                     flag = true;
                 }
@@ -458,6 +466,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 //                printf("Aborted...\n");
 //                break;
 //            }
+
+            bytesTransferred += bytesPerBuffer;
 
             // Display progress
             printf("Completed %u buffers\r", buffersCompleted);
@@ -530,23 +540,100 @@ void AlazarControlThread::readLatestData(QVector<double> *ch1, QVector<double> *
         flag = false;
     }
 
+    U16 * windowBuffer = saveBuffer+((tempBuffersCompleted-1)%buffersPerAcquisition)*bytesPerBuffer/2;
+    U16 offset = 0x8000;
+    // *(1/4) represents the bit shift moving from int 16 to int 14
+    // *(1/8192) respresents the scaling of this range from -8192 to 8192 to -1 to 1
+    // *voltageRange represents the scaling of -1 to 1 to -Voltage max to +Voltage max
+    double ch1_scale = InputRangeIdToVolts(inputRange[0])*(1/8192.0)*(1/4.0);
+    double ch2_scale = InputRangeIdToVolts(inputRange[1])*(1/8192.0)*(1/4.0);
+    double ch3_scale = InputRangeIdToVolts(inputRange[2])*(1/8192.0)*(1/4.0);
+    double ch4_scale = InputRangeIdToVolts(inputRange[3])*(1/8192.0)*(1/4.0);
+
     for (int i=0;i<totalSamplesPerChannelPerRecord;i++){
-        ch1_tempBuffer[i] = saveBuffer[i*4+0 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
-        ch2_tempBuffer[i] = saveBuffer[i*4+1 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
-        ch3_tempBuffer[i] = saveBuffer[i*4+2 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
-        ch4_tempBuffer[i] = saveBuffer[i*4+3 + (tempBuffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2];
+        // could put a dereferencing section here for the first loop for two dimensional vectors
+        (*ch1)[i] = ch1_scale*(windowBuffer[i*4+0]-offset);
+        (*ch2)[i] = ch2_scale*(windowBuffer[i*4+1]-offset);
+        (*ch3)[i] = ch3_scale*(windowBuffer[i*4+2]-offset);
+        (*ch4)[i] = ch4_scale*(windowBuffer[i*4+3]-offset);
     }
-
-
-    *ch1 = ch1_tempBuffer;
-    *ch2 = ch2_tempBuffer;
-    *ch3 = ch3_tempBuffer;
-    *ch4 = ch4_tempBuffer;
 }
 
 void AlazarControlThread::stopRunning()
 {
     running = false;
+}
+
+double AlazarControlThread::InputRangeIdToVolts(U32 inputRangeId)
+{
+    double inputRange_volts;
+
+    switch (inputRangeId)
+    {
+    case INPUT_RANGE_PM_20_MV:
+        inputRange_volts = 20.e-3;
+        break;
+    case INPUT_RANGE_PM_40_MV:
+        inputRange_volts = 40.e-3;
+        break;
+    case INPUT_RANGE_PM_50_MV:
+        inputRange_volts = 50.e-3;
+        break;
+    case INPUT_RANGE_PM_80_MV:
+        inputRange_volts = 80.e-3;
+        break;
+    case INPUT_RANGE_PM_100_MV:
+        inputRange_volts = 100.e-3;
+        break;
+    case INPUT_RANGE_PM_200_MV:
+        inputRange_volts = 200.e-3;
+        break;
+    case INPUT_RANGE_PM_400_MV:
+        inputRange_volts = 400.e-3;
+        break;
+    case INPUT_RANGE_PM_500_MV:
+        inputRange_volts = 500.e-3;
+        break;
+    case INPUT_RANGE_PM_800_MV:
+        inputRange_volts = 800.e-3;
+        break;
+    case INPUT_RANGE_PM_1_V:
+        inputRange_volts = 1.;
+        break;
+    case INPUT_RANGE_PM_2_V:
+        inputRange_volts = 2.;
+        break;
+    case INPUT_RANGE_PM_4_V:
+        inputRange_volts = 4.;
+        break;
+    case INPUT_RANGE_PM_5_V:
+        inputRange_volts = 5.;
+        break;
+    case INPUT_RANGE_PM_8_V:
+        inputRange_volts = 8.;
+        break;
+    case INPUT_RANGE_PM_10_V:
+        inputRange_volts = 10.;
+        break;
+    case INPUT_RANGE_PM_20_V:
+        inputRange_volts = 20.;
+        break;
+    case INPUT_RANGE_PM_40_V:
+        inputRange_volts = 40.;
+        break;
+    case INPUT_RANGE_PM_16_V:
+        inputRange_volts = 16.;
+        break;
+    case INPUT_RANGE_HIFI:
+        inputRange_volts = 0.525;
+        break;
+    default:
+        printf("Error: Invalid input range %u\n", inputRangeId);
+        inputRange_volts = -1.;
+        break;
+    }
+
+    return inputRange_volts;
 }
 
 #ifndef WIN32

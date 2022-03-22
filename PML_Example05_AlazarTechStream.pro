@@ -16,6 +16,7 @@ SOURCES += \
 
 HEADERS += \
     AlazarControlThread.h \
+    acquisitionConfig.h \
     mainwindow.h \
     qcustomplot.h
 
