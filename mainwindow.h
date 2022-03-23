@@ -5,11 +5,7 @@
 #include "AlazarControlThread.h"
 #include "qcustomplot.h"
 #include "acquisitionConfig.h"
-
-
-// TODO: Add #defines for common constants (in particular data size constants) - add this and pass it to the constructor for the main window
-
-#define CONSTANT_QWJEQJIWE (2000)
+#include "dataProcessingThread.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -23,17 +19,36 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void setupTimeDomainPlot(QCustomPlot *customPlot);
+    void setupAvgSigPlot(QCustomPlot *customPlot);
+    void setupSigPlot(QCustomPlot *customPlot);
+    void setupImgPlot(QCustomPlot *customPlot);
 
 private slots:
     void updateTimeDomain();
+    void updateAvgSig();
+    void updateSig();
 
 private:
     Ui::MainWindow *ui;
     AlazarControlThread dataThread;
+    dataProcessingThread processingThread;
+
     QVector<double> ch1;
     QVector<double> ch2;
     QVector<double> ch3;
     QVector<double> ch4;
     QVector<double> x;
+
+    QVector< QVector<double> > avgSig;
+
+    QVector<double> sig_m1;
+    QVector<double> sig_m2;
+    QVector<double> y;
+
+
+    QCPColorMap *colorMap;
+    int last_y_index;
+    double img_count[300][300];
+
 };
 #endif // MAINWINDOW_H

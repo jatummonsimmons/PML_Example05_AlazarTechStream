@@ -6,13 +6,11 @@
 #include <windows.h>
 #include <stdio.h>
 
-
-
-
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    MainWindow w(nullptr);
+    // declared as static to allow more memory reservation
+    static MainWindow w(nullptr);
     w.show();
     return a.exec();
 }

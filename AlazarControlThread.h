@@ -51,11 +51,14 @@ class AlazarControlThread : public QThread
 public:
     AlazarControlThread(QObject *parent = nullptr);
     ~AlazarControlThread();
-    void readLatestData(QVector<double> *ch1, QVector<double> *ch2, QVector<double> *ch3, QVector<double> *ch4);
+    void readLatestData(QVector< QVector<double> > *ch1,
+                        QVector< QVector<double> > *ch2,
+                        QVector< QVector<double> > *ch3,
+                        QVector< QVector<double> > *ch4);
     void stopRunning();
 
 signals:
-    void dataReady();
+    void dataReady(AlazarControlThread * dataThread);
 
 protected:
     void run() override;
@@ -76,7 +79,6 @@ private:
 
     U32 bytesPerBuffer;
     U32 buffersCompleted;
-
 
     U16 * saveBuffer;
     QMutex mutex;

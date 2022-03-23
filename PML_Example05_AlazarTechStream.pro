@@ -10,6 +10,7 @@ CONFIG += console
 
 SOURCES += \
     AlazarControlThread.cpp \
+    dataProcessingThread.cpp \
     main.cpp \
     mainwindow.cpp \
     qcustomplot.cpp
@@ -17,6 +18,7 @@ SOURCES += \
 HEADERS += \
     AlazarControlThread.h \
     acquisitionConfig.h \
+    dataProcessingThread.h \
     mainwindow.h \
     qcustomplot.h
 

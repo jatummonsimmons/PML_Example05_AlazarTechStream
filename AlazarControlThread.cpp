@@ -85,7 +85,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
 
 
     // TODO: Select channel A input parameters as required
-    inputRange[0] = INPUT_RANGE_PM_400_MV;
+    inputRange[0] = INPUT_RANGE_PM_4_V;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_A,
@@ -99,7 +99,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel B input parameters as required
-    inputRange[1] = INPUT_RANGE_PM_400_MV;
+    inputRange[1] = INPUT_RANGE_PM_2_V;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_B,
@@ -367,7 +367,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         {
             // TODO: Set a buffer timeout that is longer than the time
             //       required to capture all the records in one buffer.
-            U32 timeout_ms = 10000;
+            U32 timeout_ms = 10000000;
 
             // Wait for the buffer at the head of the list of available buffers
             // to be filled by the board.
@@ -377,46 +377,16 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             retCode = AlazarWaitAsyncBufferComplete(boardHandle, pBuffer, timeout_ms);
             if (retCode != ApiSuccess)
             {
-                printf("Error: AlazarWaitAsyncBufferComplete failed -- %s\n",
-                       AlazarErrorToText(retCode));
+//                printf("Error: AlazarWaitAsyncBufferComplete failed -- %s\n",
+//                       AlazarErrorToText(retCode));
+                qDebug() << "Error: AlazarWaitAsyncBufferComplete failed --" << AlazarErrorToText(retCode);
                 success = FALSE;
             }
 
             if (success)
             {
-                // The buffer is full and has been removed from the list
-                // of buffers available for the board
-//                {
-//                    QMutexLocker locker(&mutex);
-//                    buffersCompleted++;
-//                }
 
-                // TODO: Process sample data in this buffer.
-
-                // NOTE:
-                //
-                // While you are processing this buffer, the board is already filling the next
-                // available buffer(s).
-                //
-                // You MUST finish processing this buffer and post it back to the board before
-                // the board fills all of its available DMA buffers and on-board memory.
-                //
-                // Samples are arranged in the buffer as follows: S0A, S0B, ..., S1A, S1B, ...
-                // with SXY the sample number X of channel Y.
-                //
-                // A 14-bit sample code is stored in the most significant bits of in each 16-bit
-                // sample value.
-                // Sample codes are unsigned by default. As a result:
-                // - a sample code of 0x0000 represents a negative full scale input signal.
-                // - a sample code of 0x8000 represents a ~0V signal.
-                // - a sample code of 0xFFFF represents a positive full scale input signal.
-//                if (buffersCompleted == 350){
-//                    bool pause = true;
-//                    U16 * tempBuffer = new U16[bytesPerBuffer/2];
-//                    memcpy(tempBuffer,pBuffer,bytesPerBuffer);
-//                    qDebug() << tempBuffer[1];
-//                }
-                // JATS CHANGE: simple version will just mutex a saveBuffer and update it
+                // JATS CHANGE: adding buffer completed
                 U64 index = (buffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2;
                 memmove(&(saveBuffer[index]),pBuffer,bytesPerBuffer);
                 {
@@ -427,7 +397,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 }
 
                 if (sendEmit){
-                    emit dataReady();
+                    qDebug() << "Emit sent on buffer number" << buffersCompleted;
+                    emit dataReady(this);
                 }
 
                 if (saveData)
@@ -436,8 +407,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                     size_t bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, fpData);
                     if (bytesWritten != bytesPerBuffer)
                     {
-                        printf("Error: Write buffer %u failed -- %u\n", buffersCompleted,
-                               GetLastError());
+//                        printf("Error: Write buffer %u failed -- %u\n", buffersCompleted,
+//                               GetLastError());
+                        qDebug() << "Error: Write buffer" << buffersCompleted << "failed --" << GetLastError();
+
                         success = FALSE;
                     }
                 }
@@ -449,29 +422,23 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 retCode = AlazarPostAsyncBuffer(boardHandle, pBuffer, bytesPerBuffer);
                 if (retCode != ApiSuccess)
                 {
-                    printf("Error: AlazarPostAsyncBuffer failed -- %s\n",
-                           AlazarErrorToText(retCode));
+//                    printf("Error: AlazarPostAsyncBuffer failed -- %s\n",
+//                           AlazarErrorToText(retCode));
+                    //qDebug() << "Error: AlazarPostAsyncBuffer failed --" << AlazarErrorToText(retCode);
                     success = FALSE;
                 }
             }
 
             // If the acquisition failed, exit the acquisition loop
             if (!success)
+                //qDebug() << "Acquisition has failed. Exiting acquisition loop...";
                 break;
-
-            // JATS CHANGE: removed keypress sensitivity
-            // If a key was pressed, exit the acquisition loop
-//            if (_kbhit())
-//            {
-//                printf("Aborted...\n");
-//                break;
-//            }
 
             bytesTransferred += bytesPerBuffer;
 
             // Display progress
-            printf("Completed %u buffers\r", buffersCompleted);
-            qDebug() << "Completed " << buffersCompleted << " buffers";
+//            printf("Completed %u buffers\r", buffersCompleted);
+            //qDebug() << buffersCompleted;
 
         }
 
@@ -530,8 +497,12 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     return success;
 }
 
-void AlazarControlThread::readLatestData(QVector<double> *ch1, QVector<double> *ch2, QVector<double> *ch3, QVector<double> *ch4)
+void AlazarControlThread::readLatestData(QVector< QVector<double> > *ch1,
+                                         QVector< QVector<double> > *ch2,
+                                         QVector< QVector<double> > *ch3,
+                                         QVector< QVector<double> > *ch4)
 {
+    U32 startTickCount = GetTickCount();
     U64 totalSamplesPerChannelPerRecord = preTriggerSamples + postTriggerSamples;
     U32 tempBuffersCompleted = 0;
     {
@@ -542,6 +513,7 @@ void AlazarControlThread::readLatestData(QVector<double> *ch1, QVector<double> *
 
     U16 * windowBuffer = saveBuffer+((tempBuffersCompleted-1)%buffersPerAcquisition)*bytesPerBuffer/2;
     U16 offset = 0x8000;
+
     // *(1/4) represents the bit shift moving from int 16 to int 14
     // *(1/8192) respresents the scaling of this range from -8192 to 8192 to -1 to 1
     // *voltageRange represents the scaling of -1 to 1 to -Voltage max to +Voltage max
@@ -549,14 +521,19 @@ void AlazarControlThread::readLatestData(QVector<double> *ch1, QVector<double> *
     double ch2_scale = InputRangeIdToVolts(inputRange[1])*(1/8192.0)*(1/4.0);
     double ch3_scale = InputRangeIdToVolts(inputRange[2])*(1/8192.0)*(1/4.0);
     double ch4_scale = InputRangeIdToVolts(inputRange[3])*(1/8192.0)*(1/4.0);
-
-    for (int i=0;i<totalSamplesPerChannelPerRecord;i++){
-        // could put a dereferencing section here for the first loop for two dimensional vectors
-        (*ch1)[i] = ch1_scale*(windowBuffer[i*4+0]-offset);
-        (*ch2)[i] = ch2_scale*(windowBuffer[i*4+1]-offset);
-        (*ch3)[i] = ch3_scale*(windowBuffer[i*4+2]-offset);
-        (*ch4)[i] = ch4_scale*(windowBuffer[i*4+3]-offset);
+    U64 index_offset;
+    for (int i = 0; i < RECORDS_PER_BUFFER; i++){
+        // could put a dereferencing section here for the first loop for two dimensional vectors to save some compute time
+        index_offset = i*totalSamplesPerChannelPerRecord*4;
+        for (int j = 0; j < totalSamplesPerChannelPerRecord; j++){
+            (*ch1)[i][j] = ch1_scale*(windowBuffer[j*4+0+index_offset]-offset);
+            (*ch2)[i][j] = ch2_scale*(windowBuffer[j*4+1+index_offset]-offset);
+            (*ch3)[i][j] = ch3_scale*(windowBuffer[j*4+2+index_offset]-offset);
+            (*ch4)[i][j] = ch4_scale*(windowBuffer[j*4+3+index_offset]-offset);
+        }
     }
+    double transferTime_sec = (GetTickCount() - startTickCount) / 1000.;
+    qDebug() << transferTime_sec;
 }
 
 void AlazarControlThread::stopRunning()
