@@ -11,6 +11,8 @@ dataProcessingThread::dataProcessingThread(QObject *parent) :
     avgSig_flag(false),
     sig_m1(RECORDS_PER_BUFFER),
     sig_m2(RECORDS_PER_BUFFER),
+    sig_sc(RECORDS_PER_BUFFER),
+    sig_pa(RECORDS_PER_BUFFER),
     sig_flag(false)
 {
 
@@ -52,10 +54,14 @@ void dataProcessingThread::read_avgSig(QVector< QVector<double> > *avgSig_ch1)
     avgSig_flag = false;
 }
 
-void dataProcessingThread::read_sig(QVector<double> *sig_m1, QVector<double> *sig_m2)
+void dataProcessingThread::read_sig(QVector<double> *sig_pa,
+                                    QVector<double> *sig_sc,
+                                    QVector<double> *sig_m1,
+                                    QVector<double> *sig_m2)
 {
     QMutexLocker locker(&sig_mutex);
-
+    *sig_pa = this->sig_pa;
+    *sig_sc = this->sig_sc;
     *sig_m1 = this->sig_m1;
     *sig_m2 = this->sig_m2;
 
@@ -95,12 +101,25 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
 
     // Average signal emission
     QVector< QVector<double> > temp_avgSig(NUM_AVERAGE_SIGNALS, QVector<double>(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES));
+    QVector< QVector<double> > temp_alignedSig(RECORDS_PER_BUFFER, QVector<double>(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES));
+
     bool avgSig_sendEmit;
+
+    for (int i =0; i < RECORDS_PER_BUFFER; i++){
+        double DC = 0;
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+            DC += temp_rawSig_ch1[i][j];
+        }
+        DC /= (PRE_TRIGGER_SAMPLES);
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
+            temp_alignedSig[i][j] = temp_rawSig_ch1[i][j] - DC;
+        }
+    }
 
     for(int i = 0; i < NUM_AVERAGE_SIGNALS;i++){
         for(int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
             for (int k = 0; k < RECORDS_PER_BUFFER/NUM_AVERAGE_SIGNALS; k++){
-                temp_avgSig[i][j] += temp_rawSig_ch3[k+i*RECORDS_PER_BUFFER/NUM_AVERAGE_SIGNALS][j];
+                temp_avgSig[i][j] += temp_alignedSig[k+i*RECORDS_PER_BUFFER/NUM_AVERAGE_SIGNALS][j];
             }
             temp_avgSig[i][j] /= RECORDS_PER_BUFFER/NUM_AVERAGE_SIGNALS;
         }
@@ -121,6 +140,8 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     // Extracted signal emission for all data points
     QVector< double > temp_sig_m1(RECORDS_PER_BUFFER);
     QVector< double > temp_sig_m2(RECORDS_PER_BUFFER);
+    QVector< double > temp_sig_pa(RECORDS_PER_BUFFER);
+    QVector< double > temp_sig_sc(RECORDS_PER_BUFFER);
     bool sig_sendEmit;
 
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
@@ -136,9 +157,33 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
         }
         temp_sig_m2[i] /= (PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
     }
+    //Only averaging pre-trigger because it avoids any corruption from PARS
+    for (int i = 0; i < RECORDS_PER_BUFFER; i++){
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+            temp_sig_sc[i] += temp_rawSig_ch2[i][j];
+        }
+        temp_sig_sc[i] /= (PRE_TRIGGER_SAMPLES);
+    }
+    //Assuming step PARS extraction from channel
+    for (int i = 0; i < RECORDS_PER_BUFFER; i++){
+        // Iterate over pre trigger region to extract DC
+        double DC = 0;
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+            DC += temp_rawSig_ch1[i][j];
+        }
+        DC /= (PRE_TRIGGER_SAMPLES);
+
+        for (int j = PRE_TRIGGER_SAMPLES;j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES;j++){
+            temp_sig_pa[i] += temp_rawSig_ch1[i][j];
+        }
+        temp_sig_pa[i] /= (POST_TRIGGER_SAMPLES);
+        temp_sig_pa[i] -= DC;
+    }
 
     {
         QMutexLocker locker(&sig_mutex);
+        sig_pa = temp_sig_pa;
+        sig_sc = temp_sig_sc;
         sig_m1 = temp_sig_m1;
         sig_m2 = temp_sig_m2;
         sig_sendEmit = !sig_flag;

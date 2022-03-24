@@ -22,6 +22,8 @@ public:
     void setupAvgSigPlot(QCustomPlot *customPlot);
     void setupSigPlot(QCustomPlot *customPlot);
     void setupImgPlot(QCustomPlot *customPlot);
+    void setupSigVsMirrorPlot(QCustomPlot *customPlot);
+
 
 private slots:
     void updateTimeDomain();
@@ -43,12 +45,13 @@ private:
 
     QVector<double> sig_m1;
     QVector<double> sig_m2;
+    QVector<double> sig_sc;
+    QVector<double> sig_pa;
     QVector<double> y;
 
-
-    QCPColorMap *colorMap;
+    QCPColorMap *colorMap_sc;
     int last_y_index;
     double img_count[300][300];
-
+    double img_sc[300][300];
 };
 #endif // MAINWINDOW_H

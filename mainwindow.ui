@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1754</width>
-    <height>757</height>
+    <width>1600</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,37 +20,37 @@
       <x>10</x>
       <y>10</y>
       <width>301</width>
-      <height>231</height>
+      <height>151</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_2" native="true">
     <property name="geometry">
      <rect>
-      <x>320</x>
-      <y>10</y>
+      <x>10</x>
+      <y>170</y>
       <width>301</width>
-      <height>231</height>
+      <height>151</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_3" native="true">
     <property name="geometry">
      <rect>
-      <x>630</x>
-      <y>10</y>
+      <x>10</x>
+      <y>330</y>
       <width>301</width>
-      <height>231</height>
+      <height>151</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_4" native="true">
     <property name="geometry">
      <rect>
-      <x>940</x>
-      <y>10</y>
+      <x>10</x>
+      <y>490</y>
       <width>301</width>
-      <height>231</height>
+      <height>151</height>
      </rect>
     </property>
    </widget>
@@ -58,37 +58,87 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>250</y>
+      <y>650</y>
       <width>611</width>
-      <height>351</height>
+      <height>201</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_sig_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>630</x>
-      <y>250</y>
-      <width>611</width>
-      <height>171</height>
+      <x>320</x>
+      <y>330</y>
+      <width>301</width>
+      <height>151</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_sig_m2" native="true">
     <property name="geometry">
      <rect>
-      <x>630</x>
-      <y>440</y>
-      <width>611</width>
-      <height>161</height>
+      <x>320</x>
+      <y>490</y>
+      <width>301</width>
+      <height>151</height>
      </rect>
     </property>
    </widget>
-   <widget class="QCustomPlot" name="customPlot_img_count" native="true">
+   <widget class="QCustomPlot" name="customPlot_img_sc" native="true">
     <property name="geometry">
      <rect>
-      <x>1260</x>
+      <x>1120</x>
+      <y>20</y>
+      <width>461</width>
+      <height>361</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_sig_sc" native="true">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>170</y>
+      <width>301</width>
+      <height>151</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_sig_pa" native="true">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
       <y>10</y>
+      <width>301</width>
+      <height>151</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_pa_m1" native="true">
+    <property name="geometry">
+     <rect>
+      <x>630</x>
+      <y>10</y>
+      <width>461</width>
+      <height>311</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_sc_m1" native="true">
+    <property name="geometry">
+     <rect>
+      <x>630</x>
+      <y>330</y>
+      <width>461</width>
+      <height>311</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_img_pa" native="true">
+    <property name="geometry">
+     <rect>
+      <x>1120</x>
+      <y>390</y>
       <width>461</width>
       <height>361</height>
      </rect>
@@ -100,7 +150,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1754</width>
+     <width>1600</width>
      <height>22</height>
     </rect>
    </property>

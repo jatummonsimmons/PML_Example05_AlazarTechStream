@@ -12,41 +12,47 @@ MainWindow::MainWindow(QWidget *parent)
     avgSig(NUM_AVERAGE_SIGNALS, QVector<double>(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES)),
     sig_m1(RECORDS_PER_BUFFER),
     sig_m2(RECORDS_PER_BUFFER),
+    sig_sc(RECORDS_PER_BUFFER),
+    sig_pa(RECORDS_PER_BUFFER),
     y(RECORDS_PER_BUFFER)
 {
-    for (int i =0;i<PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES;i++){
+    for (int i =0;i<PRE_TRIGGER_SAMPLES;i++){
+        x[i] = PRE_TRIGGER_SAMPLES-i;
+    }
+    for (int i = PRE_TRIGGER_SAMPLES;i<PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES;i++){
         x[i] = i;
     }
     for (int i =0;i<RECORDS_PER_BUFFER;i++){
         y[i] = i;
     }
     ui->setupUi(this);
-    // Setting up image parameters
-    colorMap = new QCPColorMap(ui->customPlot_img_count->xAxis, ui->customPlot_img_count->yAxis);
-    memset(img_count,0,sizeof(img_count));
 
-    setupImgPlot(ui->customPlot_img_count);
+    // Setting up image parameters
+    colorMap_sc = new QCPColorMap(ui->customPlot_img_sc->xAxis, ui->customPlot_img_sc->yAxis);
+    memset(img_count,0,sizeof(img_count));
+    memset(img_sc,0,sizeof(img_sc));
+
+    // Setting up image plots
+    setupImgPlot(ui->customPlot_img_sc);
+
     // Setting up time domain plots
     setupTimeDomainPlot(ui->customPlot_1);
-    ui->customPlot_1->plotLayout()->insertRow(0);
-    ui->customPlot_1->plotLayout()->addElement(0, 0, new QCPTextElement(ui->customPlot_1, "Channel 1", QFont("sans", 12, QFont::Bold)));
     setupTimeDomainPlot(ui->customPlot_2);
-    ui->customPlot_2->plotLayout()->insertRow(0);
-    ui->customPlot_2->plotLayout()->addElement(0, 0, new QCPTextElement(ui->customPlot_2, "Channel 2", QFont("sans", 12, QFont::Bold)));
     setupTimeDomainPlot(ui->customPlot_3);
-    ui->customPlot_3->plotLayout()->insertRow(0);
-    ui->customPlot_3->plotLayout()->addElement(0, 0, new QCPTextElement(ui->customPlot_3, "Channel 3", QFont("sans", 12, QFont::Bold)));
     setupTimeDomainPlot(ui->customPlot_4);
-    ui->customPlot_4->plotLayout()->insertRow(0);
-    ui->customPlot_4->plotLayout()->addElement(0, 0, new QCPTextElement(ui->customPlot_4, "Channel 4", QFont("sans", 12, QFont::Bold)));
 
-    // setting up average time domain plot
+    // Setting up average time domain plot
     setupAvgSigPlot(ui->customPlot_avgSig);
 
-    // setting up signal plots
+    // Setting up signal plots
     setupSigPlot(ui->customPlot_sig_m1);
     setupSigPlot(ui->customPlot_sig_m2);
+    setupSigPlot(ui->customPlot_sig_sc);
+    setupSigPlot(ui->customPlot_sig_pa);
 
+    // setting up signal vs. mirror plot
+    setupSigVsMirrorPlot(ui->customPlot_sc_m1);
+    setupSigVsMirrorPlot(ui->customPlot_pa_m1);
 
     //Initialization connections between control thread and processing thread
     connect(&dataThread,&AlazarControlThread::dataReady,
@@ -95,34 +101,79 @@ void MainWindow::updateAvgSig()
 
 void MainWindow::updateSig()
 {
-    processingThread.read_sig(&sig_m1,&sig_m2);
+    processingThread.read_sig(&sig_pa,&sig_sc,&sig_m1,&sig_m2);
 
+    // Update extracted signal vs. buffer
+    ui->customPlot_sig_pa->graph(0)->setData(y,sig_pa);
+    ui->customPlot_sig_sc->graph(0)->setData(y,sig_sc);
     ui->customPlot_sig_m1->graph(0)->setData(y,sig_m1);
     ui->customPlot_sig_m2->graph(0)->setData(y,sig_m2);
+    ui->customPlot_sig_pa->replot();
+    ui->customPlot_sig_sc->replot();
     ui->customPlot_sig_m1->replot();
     ui->customPlot_sig_m2->replot();
 
+    // Update extracted signal vs. fast axis
+    ui->customPlot_sc_m1->graph(0)->setData(sig_m1,sig_sc);
+    ui->customPlot_pa_m1->graph(0)->setData(sig_m1,sig_pa);
+    ui->customPlot_sc_m1->replot();
+    ui->customPlot_pa_m1->replot();
 
+    // Update image
     int temp_x_index;
     int temp_y_index;
 
     for (int i = 0; i < sig_m1.length(); i++)
     {
-        colorMap->data()->coordToCell(sig_m1[i], sig_m2[i], &temp_x_index, &temp_y_index);
+        colorMap_sc->data()->coordToCell(sig_m1[i], sig_m2[i], &temp_x_index, &temp_y_index);
+        //ensure the user has properly set the channel parameters
+        if (temp_x_index < 0){
+            temp_x_index = 0;
+        }
+        if (temp_x_index >= 300){
+            temp_x_index = 299;
+        }
+        if (temp_y_index < 0){
+            temp_y_index = 0;
+        }
+        if (temp_y_index >= 300){
+            temp_y_index = 299;
+        }
+
         img_count[temp_x_index][temp_y_index] +=1;
-        //img_pars_acc[temp_x_index][temp_y_index] += temp_sig_pars[i];
-//        colorMap->data()->setCell(temp_x_index,temp_y_index,
-//                                  img_pars_acc[temp_x_index][temp_y_index]/img_count[temp_x_index][temp_y_index]);
-        colorMap->data()->setCell(temp_x_index,temp_y_index,
-                                  img_count[temp_x_index][temp_y_index]);
+        img_sc[temp_x_index][temp_y_index] += sig_sc[i];
+        colorMap_sc->data()->setCell(temp_x_index,temp_y_index,
+                                  img_sc[temp_x_index][temp_y_index]/img_count[temp_x_index][temp_y_index]);
     }
+
     if (last_y_index == 0){
         last_y_index = temp_y_index;
     }
 
     if (std::abs(temp_y_index - last_y_index) > 1){
-        ui->customPlot_img_count->replot();
+        int erase_line;
+        if (temp_y_index == 299){
+            erase_line = temp_y_index - 1;
+        }
+        else if (temp_y_index == 0){
+            erase_line = temp_y_index + 1;
+        }
+        else if (temp_y_index - last_y_index < 0){
+            erase_line = temp_y_index - 1;
+        }
+        else if (temp_y_index - last_y_index > 0){
+            erase_line = temp_y_index + 1;
+        }
+
+        for (int i = 0; i < 300; i++){
+            colorMap_sc->data()->setCell(i,erase_line,0);
+            img_count[i][erase_line] = 0;
+            img_sc[i][erase_line] = 0;
+        }
+        colorMap_sc->rescaleDataRange();
+        ui->customPlot_img_sc->replot();
         last_y_index = temp_y_index;
+
     }
 
 }
@@ -137,7 +188,7 @@ void MainWindow::setupTimeDomainPlot(QCustomPlot *customPlot)
     customPlot->yAxis->setLabel("Amplitude (V)");
 
     customPlot->xAxis->setRange(0, PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
-    customPlot->yAxis->setRange(-1,1);
+    customPlot->yAxis->setRange(-0.05,0.05);
 
     customPlot->setInteraction(QCP::iRangeZoom,true);
     customPlot->axisRect()->setRangeZoom(customPlot->yAxis->orientation());
@@ -156,7 +207,7 @@ void MainWindow::setupAvgSigPlot(QCustomPlot *customPlot)
     customPlot->yAxis->setLabel("Amplitude (V)");
 
     customPlot->xAxis->setRange(0, PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
-    customPlot->yAxis->setRange(-1,1);
+    customPlot->yAxis->setRange(-0.05,0.05);
 
     customPlot->setInteraction(QCP::iRangeZoom,true);
     customPlot->axisRect()->setRangeZoom(customPlot->yAxis->orientation());
@@ -172,7 +223,7 @@ void MainWindow::setupSigPlot(QCustomPlot *customPlot)
     customPlot->yAxis->setLabel("Amplitude (V)");
 
     customPlot->xAxis->setRange(0, RECORDS_PER_BUFFER);
-    customPlot->yAxis->setRange(-1,1);
+    customPlot->yAxis->setRange(-0.05,0.05);
 
     customPlot->setInteraction(QCP::iRangeZoom,true);
     customPlot->axisRect()->setRangeZoom(customPlot->yAxis->orientation());
@@ -190,18 +241,18 @@ void MainWindow::setupImgPlot(QCustomPlot *customPlot)
     // set up the QCPColorMap:
     int nx = 300;
     int ny = 300;
-    colorMap->data()->setSize(nx, ny); // we want the color map to have nx * ny data points
-    colorMap->data()->setRange(QCPRange(-0.003, 0.003), QCPRange(-0.003, 0.003)); // and span the coordinate range -1400, 1400 in both key (x) and value (y) dimensions
+    colorMap_sc->data()->setSize(nx, ny); // we want the color map to have nx * ny data points
+    colorMap_sc->data()->setRange(QCPRange(-0.03, 0.03), QCPRange(-0.03, 0.03)); // and span the coordinate range -1400, 1400 in both key (x) and value (y) dimensions
 
     // add a color scale:
     QCPColorScale *colorScale = new QCPColorScale(customPlot);
     customPlot->plotLayout()->addElement(0, 1, colorScale); // add it to the right of the main axis rect
     colorScale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
-    colorMap->setColorScale(colorScale); // associate the color map with the color scale
-    colorScale->axis()->setLabel("PARS Amplitude (ADC Units)");
+    colorMap_sc->setColorScale(colorScale); // associate the color map with the color scale
+    colorScale->axis()->setLabel("Scattering Amplitude (Voltage)");
 
     // set the color gradient of the color map to one of the presets:
-    colorMap->setGradient(QCPColorGradient::gpHot);
+    colorMap_sc->setGradient(QCPColorGradient::gpHot);
     // we could have also created a QCPColorGradient instance and added own colors to
     // the gradient, see the documentation of QCPColorGradient for what's possible.
 
@@ -211,7 +262,23 @@ void MainWindow::setupImgPlot(QCustomPlot *customPlot)
     colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
 
     // rescale the key (x) and value (y) axes so the whole color map is visible:
-    colorMap->setDataRange(QCPRange(0,100));
+    colorMap_sc->setDataRange(QCPRange(0,100));
     customPlot->rescaleAxes();
 
+}
+
+void MainWindow::setupSigVsMirrorPlot(QCustomPlot *customPlot)
+{
+    customPlot->addGraph();
+    customPlot->xAxis->setLabel("Position (V)");
+    customPlot->yAxis->setLabel("Amplitude (V)");
+
+    customPlot->xAxis->setRange(-0.02,0.02);
+    customPlot->yAxis->setRange(0,0.5);
+
+    customPlot->setInteraction(QCP::iRangeZoom,true);
+    customPlot->axisRect()->setRangeZoom(customPlot->yAxis->orientation());
+
+    customPlot->setInteraction(QCP::iRangeDrag,true);
+    customPlot->axisRect()->setRangeDrag(customPlot->yAxis->orientation());
 }
