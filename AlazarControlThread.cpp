@@ -113,7 +113,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel C input parameters as required
-    inputRange[2] = INPUT_RANGE_PM_200_MV;
+    inputRange[2] = INPUT_RANGE_PM_2_V;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_C,
@@ -127,7 +127,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
     }
 
     // TODO: Select channel D input parameters as required
-    inputRange[3] = INPUT_RANGE_PM_200_MV;
+    inputRange[3] = INPUT_RANGE_PM_2_V;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_D,

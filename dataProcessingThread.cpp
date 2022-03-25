@@ -105,17 +105,18 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
 
     bool avgSig_sendEmit;
 
+    // Align the time domains in height
     for (int i =0; i < RECORDS_PER_BUFFER; i++){
         double DC = 0;
-        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
             DC += temp_rawSig_ch1[i][j];
         }
-        DC /= (PRE_TRIGGER_SAMPLES);
+        DC /= (PRE_TRIGGER_SAMPLES-50);
         for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
             temp_alignedSig[i][j] = temp_rawSig_ch1[i][j] - DC;
         }
     }
-
+    // Average the time domains along the record axis
     for(int i = 0; i < NUM_AVERAGE_SIGNALS;i++){
         for(int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
             for (int k = 0; k < RECORDS_PER_BUFFER/NUM_AVERAGE_SIGNALS; k++){
@@ -168,15 +169,15 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         // Iterate over pre trigger region to extract DC
         double DC = 0;
-        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+        for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
             DC += temp_rawSig_ch1[i][j];
         }
-        DC /= (PRE_TRIGGER_SAMPLES);
+        DC /= (PRE_TRIGGER_SAMPLES-50);
 
-        for (int j = PRE_TRIGGER_SAMPLES;j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES;j++){
+        for (int j = 100;j < 180;j++){
             temp_sig_pa[i] += temp_rawSig_ch1[i][j];
         }
-        temp_sig_pa[i] /= (POST_TRIGGER_SAMPLES);
+        temp_sig_pa[i] /= (80);
         temp_sig_pa[i] -= DC;
     }
 
