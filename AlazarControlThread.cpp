@@ -3,10 +3,11 @@
 AlazarControlThread :: AlazarControlThread(QObject *parent) :
     QThread(parent),
     flag(false),
-    running(true)
+    running(true),
+    pauseSaveBuffer(false)
 {
-
-
+    numSaveBufferAtom = 0;
+    flagAtom = false;
 }
 
 
@@ -85,7 +86,7 @@ bool AlazarControlThread::ConfigureBoard(HANDLE boardHandle)
 
 
     // TODO: Select channel A input parameters as required
-    inputRange[0] = INPUT_RANGE_PM_4_V;
+    inputRange[0] = INPUT_RANGE_PM_2_V;
 
     retCode = AlazarInputControlEx(boardHandle,
                                    CHANNEL_A,
@@ -265,6 +266,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 
     // JATS CHANGE: Add in sendEmit flag to help GUI only receive emits when it is ready
     bool sendEmit = false;
+    std::atomic<bool> sendEmitAtom = false;
 
     // Create a data file if required
     FILE *fpData = NULL;
@@ -361,7 +363,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         //JATS CHANGE: printf("Capturing %d buffers ... press any key to abort\n", buffersPerAcquisition);
 
         U32 startTickCount = GetTickCount();
-        buffersCompleted = 0;
+        U32 buffersCompleted = 0;
+        U32 numSaveBuffers = 0;
         INT64 bytesTransferred = 0;
         while (running)
         {
@@ -375,29 +378,35 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             U16 *pBuffer = BufferArray[bufferIndex];
 
             retCode = AlazarWaitAsyncBufferComplete(boardHandle, pBuffer, timeout_ms);
+
             if (retCode != ApiSuccess)
             {
-//                printf("Error: AlazarWaitAsyncBufferComplete failed -- %s\n",
-//                       AlazarErrorToText(retCode));
                 qDebug() << "Error: AlazarWaitAsyncBufferComplete failed --" << AlazarErrorToText(retCode);
                 success = FALSE;
             }
 
-            if (success)
+            if (success && (!pauseSaveBuffer))
             {
 
-                // JATS CHANGE: adding buffer completed
-                U64 index = (buffersCompleted%buffersPerAcquisition)*bytesPerBuffer/2;
+                // JATS CHANGE: adding buffer completed                
+                U64 index = (numSaveBufferAtom%buffersPerAcquisition)*bytesPerBuffer/2;
                 memmove(&(saveBuffer[index]),pBuffer,bytesPerBuffer);
-                {
-                    QMutexLocker locker(&mutex);
-                    buffersCompleted++;
-                    sendEmit = !flag;
-                    flag = true;
-                }
 
-                if (sendEmit){
-                    qDebug() << "Emit sent on buffer number" << buffersCompleted;
+                numSaveBufferAtom++;
+                sendEmitAtom = !flagAtom;
+                flagAtom = true;
+
+
+//                {
+//                    QMutexLocker locker(&mutex);
+//                    numberOfBuffersAddedToSaveBuffer++;
+//                    sendEmit = !flag;
+//                    flag = true;
+//                }
+
+
+                if (sendEmitAtom){
+                    //qDebug() << "Emit sent on buffer number" << buffersCompleted;
                     emit dataReady(this);
                 }
 
@@ -407,13 +416,11 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                     size_t bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, fpData);
                     if (bytesWritten != bytesPerBuffer)
                     {
-//                        printf("Error: Write buffer %u failed -- %u\n", buffersCompleted,
-//                               GetLastError());
-                        qDebug() << "Error: Write buffer" << buffersCompleted << "failed --" << GetLastError();
-
+                        qDebug() << "Error: Write buffer" << numSaveBufferAtom << "failed --" << GetLastError();
                         success = FALSE;
                     }
                 }
+
             }
 
             // Add the buffer to the end of the list of available buffers.
@@ -422,8 +429,6 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 retCode = AlazarPostAsyncBuffer(boardHandle, pBuffer, bytesPerBuffer);
                 if (retCode != ApiSuccess)
                 {
-//                    printf("Error: AlazarPostAsyncBuffer failed -- %s\n",
-//                           AlazarErrorToText(retCode));
                     //qDebug() << "Error: AlazarPostAsyncBuffer failed --" << AlazarErrorToText(retCode);
                     success = FALSE;
                 }
@@ -434,10 +439,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 //qDebug() << "Acquisition has failed. Exiting acquisition loop...";
                 break;
 
+            buffersCompleted++;
             bytesTransferred += bytesPerBuffer;
 
             // Display progress
-//            printf("Completed %u buffers\r", buffersCompleted);
             //qDebug() << buffersCompleted;
 
         }
@@ -502,14 +507,16 @@ void AlazarControlThread::readLatestData(QVector< QVector<double> > *ch1,
                                          QVector< QVector<double> > *ch3,
                                          QVector< QVector<double> > *ch4)
 {
-    U32 startTickCount = GetTickCount();
+    //U32 startTickCount = GetTickCount();
     U64 totalSamplesPerChannelPerRecord = preTriggerSamples + postTriggerSamples;
     U32 tempBuffersCompleted = 0;
-    {
-        QMutexLocker locker(&mutex);
-        tempBuffersCompleted = buffersCompleted;
-        flag = false;
-    }
+//    {
+//        QMutexLocker locker(&mutex);
+//        tempBuffersCompleted = numberOfBuffersAddedToSaveBuffer;
+//        flag = false;
+//    }
+    tempBuffersCompleted = numSaveBufferAtom;
+    flagAtom = false;
 
     U16 * windowBuffer = saveBuffer+((tempBuffersCompleted-1)%buffersPerAcquisition)*bytesPerBuffer/2;
     U16 offset = 0x8000;
@@ -532,8 +539,8 @@ void AlazarControlThread::readLatestData(QVector< QVector<double> > *ch1,
             (*ch4)[i][j] = ch4_scale*(windowBuffer[j*4+3+index_offset]-offset);
         }
     }
-    double transferTime_sec = (GetTickCount() - startTickCount) / 1000.;
-    qDebug() << transferTime_sec;
+    //double transferTime_sec = (GetTickCount() - startTickCount) / 1000.;
+    //qDebug() << transferTime_sec;
 }
 
 void AlazarControlThread::stopRunning()
@@ -613,37 +620,123 @@ double AlazarControlThread::InputRangeIdToVolts(U32 inputRangeId)
     return inputRange_volts;
 }
 
-#ifndef WIN32
-inline U32 GetTickCount(void)
+// saveDataBuffer function should pause writing to the saveBuffer, open a file for writing,
+// write the current buffer to a file, close file, restart writing to the saveBuffer, and return 0
+int AlazarControlThread::saveDataBuffer()
 {
-    struct timeval tv;
-    if (gettimeofday(&tv, NULL) != 0)
-        return 0;
-    return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    // Pause system saveBuffer write
+    pauseSaveBuffer = true;
+    qDebug() << "Starting file save...";
+    FILE *fpData = NULL;
+    size_t bytesWritten;
+
+    fpData = fopen("data.bin", "wb");
+    if (fpData == NULL)
+    {
+        qDebug() << "Error: Unable to create data file --" << GetLastError();
+        return 1;
+    }
+    qDebug() << "Successfully created data file";
+
+//    U32 tempBuffersCompleted = 0;
+//    {
+//        QMutexLocker locker(&mutex);
+//        tempBuffersCompleted = numberOfBuffersAddedToSaveBuffer;
+//    }
+
+    U32 tempBuffersCompleted = numSaveBufferAtom;
+    if (tempBuffersCompleted < BUFFERS_PER_ACQUISITION){
+        bytesWritten= fwrite(saveBuffer, sizeof(BYTE), tempBuffersCompleted*bytesPerBuffer, fpData);
+
+        // check if errored
+        if (bytesWritten != tempBuffersCompleted*bytesPerBuffer){
+            qDebug() << "Error: Write buffer failed --";
+            qDebug() << "Bytes written: " << bytesWritten << "does not equal" << tempBuffersCompleted*bytesPerBuffer;
+            if (fpData != NULL)
+                fclose(fpData);
+            return 1;
+        }
+    }
+    else{
+        // we have an array with [[5] [2] [3] [4]]
+        // buffersCompleted is 5, so 5%4 is 1
+        // so first fwrite from buffersCompleted to end of file
+
+
+        bytesWritten = fwrite(&saveBuffer[(tempBuffersCompleted%BUFFERS_PER_ACQUISITION)],
+                              sizeof(BYTE),
+                              (BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer,
+                              fpData);
+        qDebug() << "Writing first part: " << bytesWritten;
+        qDebug() << "tempBuffersCompleted%BUFFERS_PER_ACQUISITION" << tempBuffersCompleted%BUFFERS_PER_ACQUISITION;
+        qDebug() << "(BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer" << (BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer;
+
+        if ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION) != 0){
+            // if the buffer does not fit perfectly,
+            // then fwrite from beginning of file to buffersCompleted
+            bytesWritten += fwrite(saveBuffer,
+                                   sizeof(BYTE),
+                                   ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer,
+                                   fpData);
+            qDebug() << "Writing second part: " << bytesWritten;
+            qDebug() << "((tempBuffersCompleted%BUFFERS_PER_ACQUISITION)-1)*bytesPerBuffer" << ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION)-1)*bytesPerBuffer;
+        }
+
+        // check if errored
+        if (bytesWritten != BUFFERS_PER_ACQUISITION*bytesPerBuffer){
+            qDebug() << "Error: Write buffer failed";
+            qDebug() << "Bytes written: " << bytesWritten << "does not equal" << BUFFERS_PER_ACQUISITION*bytesPerBuffer;
+            if (fpData != NULL)
+                fclose(fpData);
+            return 1;
+        }
+    }
+
+    // Close file
+    if (fpData != NULL)
+        fclose(fpData);
+
+    // Unpause system
+    pauseSaveBuffer = false;
+    qDebug() << "File save finished successfully";
+    return 0;
 }
 
-inline void Sleep(U32 dwTime_ms)
-{
-    usleep(dwTime_ms * 1000);
-}
 
-inline int _kbhit (void)
-{
-  struct timeval tv;
-  fd_set rdfs;
 
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
 
-  FD_ZERO(&rdfs);
-  FD_SET (STDIN_FILENO, &rdfs);
 
-  select(STDIN_FILENO+1, &rdfs, NULL, NULL, &tv);
-  return FD_ISSET(STDIN_FILENO, &rdfs);
-}
+//#ifndef WIN32
+//inline U32 GetTickCount(void)
+//{
+//    struct timeval tv;
+//    if (gettimeofday(&tv, NULL) != 0)
+//        return 0;
+//    return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+//}
 
-inline int GetLastError()
-{
-    return errno;
-}
-#endif
+//inline void Sleep(U32 dwTime_ms)
+//{
+//    usleep(dwTime_ms * 1000);
+//}
+
+//inline int _kbhit (void)
+//{
+//  struct timeval tv;
+//  fd_set rdfs;
+
+//  tv.tv_sec = 0;
+//  tv.tv_usec = 0;
+
+//  FD_ZERO(&rdfs);
+//  FD_SET (STDIN_FILENO, &rdfs);
+
+//  select(STDIN_FILENO+1, &rdfs, NULL, NULL, &tv);
+//  return FD_ISSET(STDIN_FILENO, &rdfs);
+//}
+
+//inline int GetLastError()
+//{
+//    return errno;
+//}
+//#endif

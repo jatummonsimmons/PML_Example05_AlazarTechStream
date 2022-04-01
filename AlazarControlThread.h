@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <cstdint>
 #include <stdlib.h>
+#include <atomic>
 
 #include "AlazarError.h"
 #include "AlazarApi.h"
@@ -56,6 +57,7 @@ public:
                         QVector< QVector<double> > *ch3,
                         QVector< QVector<double> > *ch4);
     void stopRunning();
+    int saveDataBuffer();
 
 signals:
     void dataReady(AlazarControlThread * dataThread);
@@ -78,14 +80,14 @@ private:
     U32 buffersPerAcquisition;
 
     U32 bytesPerBuffer;
-    U32 buffersCompleted;
+    std::atomic<U32> numSaveBufferAtom;
+    std::atomic<bool> flagAtom;
 
     U16 * saveBuffer;
     QMutex mutex;
     bool flag;
     bool running;
-
-
+    bool pauseSaveBuffer;
 };
 
 #endif // ALAZARCONTROLTHREAD_H

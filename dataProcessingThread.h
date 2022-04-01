@@ -22,6 +22,7 @@ public:
     void read_avgSig(QVector<QVector<double>> *avgSig_ch1);
     void read_sig(QVector<double> *sig_pa,
                   QVector<double> *sig_sc,
+                  QVector<double> *sig_gsc,
                   QVector<double> *sig_m1,
                   QVector<double> *sig_m2);
 
@@ -53,6 +54,7 @@ private:
     QVector< double > sig_m2;
     QVector< double > sig_sc;
     QVector< double > sig_pa;
+    QVector< double > sig_gsc;
     bool sig_flag;
 
 };

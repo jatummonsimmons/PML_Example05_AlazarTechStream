@@ -23,14 +23,16 @@ public:
     void setupSigPlot(QCustomPlot *customPlot);
     void setupScImgPlot(QCustomPlot *customPlot);
     void setupPaImgPlot(QCustomPlot *customPlot);
+    void setupGScImgPlot(QCustomPlot *customPlot);
 
     void setupSigVsMirrorPlot(QCustomPlot *customPlot);
 
 
 private slots:
-    void updateTimeDomain();
     void updateAvgSig();
     void updateSig();
+
+    void on_pushButton_clicked();
 
 private:
     Ui::MainWindow *ui;
@@ -48,15 +50,19 @@ private:
     QVector<double> sig_m1;
     QVector<double> sig_m2;
     QVector<double> sig_sc;
+    QVector<double> sig_gsc;
     QVector<double> sig_pa;
     QVector<double> y;
 
     QCPColorMap *colorMap_sc;
     QCPColorMap *colorMap_pa;
+    QCPColorMap *colorMap_gsc;
     int last_y_index;
     double img_count[NUM_PIXELS][NUM_PIXELS];
     double img_sc[NUM_PIXELS][NUM_PIXELS];
     double img_pa[NUM_PIXELS][NUM_PIXELS];
+    double img_gsc[NUM_PIXELS][NUM_PIXELS];
+
 
 };
 #endif // MAINWINDOW_H

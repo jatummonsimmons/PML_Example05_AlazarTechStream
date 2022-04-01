@@ -14,134 +14,87 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QCustomPlot" name="customPlot_1" native="true">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_2" native="true">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>170</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_3" native="true">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>330</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_4" native="true">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>490</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
    <widget class="QCustomPlot" name="customPlot_avgSig" native="true">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>650</y>
-      <width>611</width>
+      <y>10</y>
+      <width>651</width>
       <height>201</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_sig_m1" native="true">
-    <property name="geometry">
-     <rect>
-      <x>320</x>
-      <y>330</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_sig_m2" native="true">
-    <property name="geometry">
-     <rect>
-      <x>320</x>
-      <y>490</y>
-      <width>301</width>
-      <height>151</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_img_sc" native="true">
     <property name="geometry">
      <rect>
-      <x>1120</x>
-      <y>20</y>
-      <width>461</width>
-      <height>361</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_sig_sc" native="true">
-    <property name="geometry">
-     <rect>
-      <x>320</x>
-      <y>170</y>
-      <width>301</width>
-      <height>151</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCustomPlot" name="customPlot_sig_pa" native="true">
-    <property name="geometry">
-     <rect>
-      <x>320</x>
+      <x>1140</x>
       <y>10</y>
-      <width>301</width>
-      <height>151</height>
+      <width>451</width>
+      <height>401</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_pa_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>630</x>
-      <y>10</y>
-      <width>461</width>
-      <height>311</height>
+      <x>10</x>
+      <y>220</y>
+      <width>651</width>
+      <height>201</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_sc_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>630</x>
-      <y>330</y>
-      <width>461</width>
-      <height>311</height>
+      <x>10</x>
+      <y>430</y>
+      <width>651</width>
+      <height>201</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_img_pa" native="true">
     <property name="geometry">
      <rect>
-      <x>1120</x>
-      <y>390</y>
-      <width>461</width>
-      <height>361</height>
+      <x>680</x>
+      <y>10</y>
+      <width>451</width>
+      <height>401</height>
      </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_gsc_m1" native="true">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>640</y>
+      <width>651</width>
+      <height>201</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_img_gsc" native="true">
+    <property name="geometry">
+     <rect>
+      <x>1140</x>
+      <y>430</y>
+      <width>451</width>
+      <height>401</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton">
+    <property name="geometry">
+     <rect>
+      <x>680</x>
+      <y>430</y>
+      <width>75</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Save Buffer</string>
     </property>
    </widget>
   </widget>

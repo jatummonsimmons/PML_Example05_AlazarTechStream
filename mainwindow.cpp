@@ -13,6 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
     sig_m1(RECORDS_PER_BUFFER),
     sig_m2(RECORDS_PER_BUFFER),
     sig_sc(RECORDS_PER_BUFFER),
+    sig_gsc(RECORDS_PER_BUFFER),
     sig_pa(RECORDS_PER_BUFFER),
     y(RECORDS_PER_BUFFER)
 {
@@ -27,40 +28,48 @@ MainWindow::MainWindow(QWidget *parent)
     // Setting up image parameters
     colorMap_sc = new QCPColorMap(ui->customPlot_img_sc->xAxis, ui->customPlot_img_sc->yAxis);
     colorMap_pa = new QCPColorMap(ui->customPlot_img_pa->xAxis, ui->customPlot_img_pa->yAxis);
+    colorMap_gsc = new QCPColorMap(ui->customPlot_img_gsc->xAxis, ui->customPlot_img_gsc->yAxis);
 
     memset(img_count,0,sizeof(img_count));
     memset(img_sc,0,sizeof(img_sc));
     memset(img_pa,0,sizeof(img_pa));
+    memset(img_gsc,0,sizeof(img_gsc));
 
     // Setting up image plots
     setupScImgPlot(ui->customPlot_img_sc);
     setupPaImgPlot(ui->customPlot_img_pa);
+    setupGScImgPlot(ui->customPlot_img_gsc);
 
+/* Commented out to simplify UI
     // Setting up time domain plots
     setupTimeDomainPlot(ui->customPlot_1);
     setupTimeDomainPlot(ui->customPlot_2);
     setupTimeDomainPlot(ui->customPlot_3);
     setupTimeDomainPlot(ui->customPlot_4);
+*/
 
     // Setting up average time domain plot
     setupAvgSigPlot(ui->customPlot_avgSig);
 
+/* Commented out to simplify UI
     // Setting up signal plots
     setupSigPlot(ui->customPlot_sig_m1);
     setupSigPlot(ui->customPlot_sig_m2);
     setupSigPlot(ui->customPlot_sig_sc);
     setupSigPlot(ui->customPlot_sig_pa);
+*/
 
     // setting up signal vs. mirror plot
     setupSigVsMirrorPlot(ui->customPlot_sc_m1);
     setupSigVsMirrorPlot(ui->customPlot_pa_m1);
+    setupSigVsMirrorPlot(ui->customPlot_gsc_m1);
 
     //Initialization connections between control thread and processing thread
     connect(&dataThread,&AlazarControlThread::dataReady,
             &processingThread, &dataProcessingThread::updateTimeDomains);
 
-    connect(&processingThread,&dataProcessingThread::rawSig_ready,
-            this,&MainWindow::updateTimeDomain);
+//    connect(&processingThread,&dataProcessingThread::rawSig_ready,
+//            this,&MainWindow::updateTimeDomain);
 
     connect(&processingThread,&dataProcessingThread::avgSig_ready,
             this,&MainWindow::updateAvgSig);
@@ -75,21 +84,25 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     dataThread.stopRunning();
+    delete [] colorMap_sc;
+    delete [] colorMap_gsc;
+    delete [] colorMap_pa;
+
     delete ui;
 }
 
-void MainWindow::updateTimeDomain()
-{
-    processingThread.read_rawSig(&ch1,&ch2,&ch3,&ch4);
-    ui->customPlot_1->graph(0)->setData(x,ch1);
-    ui->customPlot_2->graph(0)->setData(x,ch2);
-    ui->customPlot_3->graph(0)->setData(x,ch3);
-    ui->customPlot_4->graph(0)->setData(x,ch4);
-    ui->customPlot_1->replot();
-    ui->customPlot_2->replot();
-    ui->customPlot_3->replot();
-    ui->customPlot_4->replot();
-}
+//void MainWindow::updateTimeDomain()
+//{
+//    processingThread.read_rawSig(&ch1,&ch2,&ch3,&ch4);
+//    ui->customPlot_1->graph(0)->setData(x,ch1);
+//    ui->customPlot_2->graph(0)->setData(x,ch2);
+//    ui->customPlot_3->graph(0)->setData(x,ch3);
+//    ui->customPlot_4->graph(0)->setData(x,ch4);
+//    ui->customPlot_1->replot();
+//    ui->customPlot_2->replot();
+//    ui->customPlot_3->replot();
+//    ui->customPlot_4->replot();
+//}
 
 void MainWindow::updateAvgSig()
 {
@@ -102,23 +115,25 @@ void MainWindow::updateAvgSig()
 
 void MainWindow::updateSig()
 {
-    processingThread.read_sig(&sig_pa,&sig_sc,&sig_m1,&sig_m2);
+    processingThread.read_sig(&sig_pa,&sig_sc,&sig_gsc,&sig_m1,&sig_m2);
 
     // Update extracted signal vs. buffer
-    ui->customPlot_sig_pa->graph(0)->setData(y,sig_pa);
-    ui->customPlot_sig_sc->graph(0)->setData(y,sig_sc);
-    ui->customPlot_sig_m1->graph(0)->setData(y,sig_m1);
-    ui->customPlot_sig_m2->graph(0)->setData(y,sig_m2);
-    ui->customPlot_sig_pa->replot();
-    ui->customPlot_sig_sc->replot();
-    ui->customPlot_sig_m1->replot();
-    ui->customPlot_sig_m2->replot();
+//    ui->customPlot_sig_pa->graph(0)->setData(y,sig_pa);
+//    ui->customPlot_sig_sc->graph(0)->setData(y,sig_sc);
+//    ui->customPlot_sig_m1->graph(0)->setData(y,sig_m1);
+//    ui->customPlot_sig_m2->graph(0)->setData(y,sig_m2);
+//    ui->customPlot_sig_pa->replot();
+//    ui->customPlot_sig_sc->replot();
+//    ui->customPlot_sig_m1->replot();
+//    ui->customPlot_sig_m2->replot();
 
     // Update extracted signal vs. fast axis
     ui->customPlot_sc_m1->graph(0)->setData(sig_m1,sig_sc);
     ui->customPlot_pa_m1->graph(0)->setData(sig_m1,sig_pa);
+    ui->customPlot_gsc_m1->graph(0)->setData(sig_m1,sig_gsc);
     ui->customPlot_sc_m1->replot();
     ui->customPlot_pa_m1->replot();
+    ui->customPlot_gsc_m1->replot();
 
     // Update scattering and pa image
     int temp_x_index;
@@ -145,18 +160,22 @@ void MainWindow::updateSig()
         img_count[temp_x_index][temp_y_index] +=1;
         img_sc[temp_x_index][temp_y_index] += sig_sc[i];
         img_pa[temp_x_index][temp_y_index] += sig_pa[i];
+        img_gsc[temp_x_index][temp_y_index] += sig_gsc[i];
+
 
         colorMap_sc->data()->setCell(temp_x_index,temp_y_index,
                                   img_sc[temp_x_index][temp_y_index]/img_count[temp_x_index][temp_y_index]);
         colorMap_pa->data()->setCell(temp_x_index,temp_y_index,
                                   img_pa[temp_x_index][temp_y_index]/img_count[temp_x_index][temp_y_index]);
+        colorMap_gsc->data()->setCell(temp_x_index,temp_y_index,
+                                  img_gsc[temp_x_index][temp_y_index]/img_count[temp_x_index][temp_y_index]);
     }
 
     if (last_y_index == 0){
         last_y_index = temp_y_index;
     }
 
-    if (std::abs(temp_y_index - last_y_index) > 1){
+    if (abs(temp_y_index - last_y_index) > 1){
         int erase_line;
         if (temp_y_index == NUM_PIXELS-1){
             erase_line = temp_y_index - 1;
@@ -174,37 +193,98 @@ void MainWindow::updateSig()
         for (int i = 0; i < NUM_PIXELS; i++){
             colorMap_sc->data()->setCell(i,erase_line,0);
             colorMap_pa->data()->setCell(i,erase_line,0);
+            colorMap_gsc->data()->setCell(i,erase_line,0);
 
             img_count[i][erase_line] = 0;
             img_sc[i][erase_line] = 0;
             img_pa[i][erase_line] = 0;
-
+            img_gsc[i][erase_line] = 0;
         }
-        colorMap_sc->rescaleDataRange();
+        qDebug() << "(GUI) Erased line:" << erase_line;
 
         // find max / min of image
-//        double max = 0;
-//        double min = 0;
-//        for(int i = 0; i < NUM_PIXELS; i++){
-//            for (int j = 0; j < NUM_PIXELS; j++){
-//                if (img_pa[i][j] < min){
-//                    min = img_pa[i][j];
-//                }
-//                if (img_pa[i][j] > max){
-//                    max = img_pa[i][j];
-//                }
-//            }
-//        }
-//        double shrink = 0.05;
-//        if (-min > max){
-//            colorMap_pa->setDataRange(QCPRange(shrink*min,-shrink*min));
-//        }
-//        else {
-//            colorMap_pa->setDataRange(QCPRange(-shrink*max, shrink*max));
-//        }
+        double sc_max;
+        double sc_min;
+        bool first = true;
+        for(int i = 0; i < NUM_PIXELS; i++){
+            for(int j = 0; j < NUM_PIXELS; j++){
+                if (img_sc[i][j] != 0){
+                    if (first){
+                        sc_min = img_sc[i][j]/img_count[i][j];
+                        sc_max = img_sc[i][j]/img_count[i][j];
+                        first = false;
+                    }
+                    else {
+                        if (img_sc[i][j] < sc_min){
+                            sc_min = img_sc[i][j]/img_count[i][j];
+                        }
+                        if (img_sc[i][j] > sc_max){
+                            sc_max = img_sc[i][j]/img_count[i][j];
+                        }
+                    }
+                }
+            }
+        }
+
+        double gsc_max;;
+        double gsc_min;
+        first = true;
+        for(int i = 0; i < NUM_PIXELS; i++){
+            for(int j = 0; j < NUM_PIXELS; j++){
+                if (img_gsc[i][j] != 0){
+                    if (first){
+                        gsc_min = img_gsc[i][j]/img_count[i][j];
+                        gsc_max = img_gsc[i][j]/img_count[i][j];
+                        first = false;
+                    }
+                    else {
+                        if (img_gsc[i][j] < gsc_min){
+                            gsc_min = img_gsc[i][j]/img_count[i][j];
+                        }
+                        if (img_gsc[i][j] > gsc_max){
+                            gsc_max = img_gsc[i][j]/img_count[i][j];
+                        }
+                    }
+                }
+            }
+        }
+
+        double pa_max;;
+        double pa_min;
+        first = true;
+        for(int i = 0; i < NUM_PIXELS; i++){
+            for(int j = 0; j < NUM_PIXELS; j++){
+                if (img_pa[i][j] != 0){
+                    if (first){
+                        pa_min = img_pa[i][j]/img_count[i][j];
+                        pa_max = img_pa[i][j]/img_count[i][j];
+                        first = false;
+                    }
+                    else {
+                        if (img_pa[i][j] < pa_min){
+                            pa_min = img_pa[i][j]/img_count[i][j];
+                        }
+                        if (img_pa[i][j] > pa_max){
+                            pa_max = img_pa[i][j]/img_count[i][j];
+                        }
+                    }
+                }
+            }
+        }
+
+        colorMap_sc->setDataRange(QCPRange(sc_min,sc_max));
+        colorMap_gsc->setDataRange(QCPRange(gsc_min,gsc_max));
+
+        if (-pa_min > pa_max){
+            colorMap_pa->setDataRange(QCPRange(pa_min,-pa_min));
+        }
+        else{
+            colorMap_pa->setDataRange(QCPRange(pa_max,-pa_max));
+        }
 
         ui->customPlot_img_sc->replot();
         ui->customPlot_img_pa->replot();
+        ui->customPlot_img_gsc->replot();
 
         last_y_index = temp_y_index;
 
@@ -318,7 +398,7 @@ void MainWindow::setupPaImgPlot(QCustomPlot *customPlot)
     customPlot->plotLayout()->addElement(0, 1, colorScale); // add it to the right of the main axis rect
     colorScale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
     colorMap_pa->setColorScale(colorScale); // associate the color map with the color scale
-    colorScale->axis()->setLabel("Scattering Amplitude (Voltage)");
+    colorScale->axis()->setLabel("PARS Amplitude (Voltage)");
 
     // set the color gradient of the color map to one of the presets:
     colorMap_pa->setGradient(QCPColorGradient::gpPolar);
@@ -331,8 +411,44 @@ void MainWindow::setupPaImgPlot(QCustomPlot *customPlot)
     colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
 
     // rescale the key (x) and value (y) axes so the whole color map is visible:
-    colorMap_pa->setDataRange(QCPRange(-0.05,0.05));
+    colorMap_pa->setDataRange(QCPRange(-0.10,0.10));
     customPlot->rescaleAxes();
+
+}
+
+void MainWindow::setupGScImgPlot(QCustomPlot *customPlot)
+{
+    // configure axis rect:
+    customPlot->setInteractions(QCP::iRangeDrag|QCP::iRangeZoom); // this will also allow rescaling the color scale by dragging/zooming
+    customPlot->axisRect()->setupFullAxesBox(true);
+
+    // set up the QCPColorMap:
+    int nx = NUM_PIXELS;
+    int ny = NUM_PIXELS;
+    colorMap_gsc->data()->setSize(nx, ny); // we want the color map to have nx * ny data points
+    colorMap_gsc->data()->setRange(QCPRange(-MIRROR_VOLTAGE_RANGE_PM_V, MIRROR_VOLTAGE_RANGE_PM_V), QCPRange(-MIRROR_VOLTAGE_RANGE_PM_V, MIRROR_VOLTAGE_RANGE_PM_V)); // and span the coordinate range -1400, 1400 in both key (x) and value (y) dimensions
+
+    // add a color scale:
+    QCPColorScale *colorScale = new QCPColorScale(customPlot);
+    customPlot->plotLayout()->addElement(0, 1, colorScale); // add it to the right of the main axis rect
+    colorScale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
+    colorMap_gsc->setColorScale(colorScale); // associate the color map with the color scale
+    colorScale->axis()->setLabel("Green Scattering Amplitude (Voltage)");
+
+    // set the color gradient of the color map to one of the presets:
+    colorMap_gsc->setGradient(QCPColorGradient::gpGrayscale);
+    // we could have also created a QCPColorGradient instance and added own colors to
+    // the gradient, see the documentation of QCPColorGradient for what's possible.
+
+    // make sure the axis rect and color scale synchronize their bottom and top margins (so they line up):
+    QCPMarginGroup *marginGroup = new QCPMarginGroup(customPlot);
+    customPlot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
+    colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
+
+    // rescale the key (x) and value (y) axes so the whole color map is visible:
+    colorMap_gsc->setDataRange(QCPRange(0,0.1));
+    customPlot->rescaleAxes();
+    customPlot->replot();
 
 }
 
@@ -351,3 +467,18 @@ void MainWindow::setupSigVsMirrorPlot(QCustomPlot *customPlot)
     customPlot->setInteraction(QCP::iRangeDrag,true);
     customPlot->axisRect()->setRangeDrag(customPlot->yAxis->orientation());
 }
+
+void MainWindow::on_pushButton_clicked()
+{
+    ui->pushButton->setEnabled(false);
+    int success = dataThread.saveDataBuffer();
+
+    ui->pushButton->setEnabled(true);
+    if (success == 1){
+        qDebug() << "(GUI) Save failed.";
+    }
+    else{
+        qDebug() << "Save successful (GUI)";
+    }
+}
+

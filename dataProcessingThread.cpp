@@ -13,6 +13,7 @@ dataProcessingThread::dataProcessingThread(QObject *parent) :
     sig_m2(RECORDS_PER_BUFFER),
     sig_sc(RECORDS_PER_BUFFER),
     sig_pa(RECORDS_PER_BUFFER),
+    sig_gsc(RECORDS_PER_BUFFER),
     sig_flag(false)
 {
 
@@ -56,12 +57,14 @@ void dataProcessingThread::read_avgSig(QVector< QVector<double> > *avgSig_ch1)
 
 void dataProcessingThread::read_sig(QVector<double> *sig_pa,
                                     QVector<double> *sig_sc,
+                                    QVector<double> *sig_gsc,
                                     QVector<double> *sig_m1,
                                     QVector<double> *sig_m2)
 {
     QMutexLocker locker(&sig_mutex);
     *sig_pa = this->sig_pa;
     *sig_sc = this->sig_sc;
+    *sig_gsc = this->sig_gsc;
     *sig_m1 = this->sig_m1;
     *sig_m2 = this->sig_m2;
 
@@ -81,7 +84,7 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
                                &temp_rawSig_ch2,
                                &temp_rawSig_ch3,
                                &temp_rawSig_ch4);
-
+/* Commented out to simplify UI
     {
         QMutexLocker locker(&rawSig_mutex);
 
@@ -98,7 +101,7 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     {
         emit rawSig_ready();
     }
-
+*/
     // Average signal emission
     QVector< QVector<double> > temp_avgSig(NUM_AVERAGE_SIGNALS, QVector<double>(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES));
     QVector< QVector<double> > temp_alignedSig(RECORDS_PER_BUFFER, QVector<double>(PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES));
@@ -109,11 +112,11 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     for (int i =0; i < RECORDS_PER_BUFFER; i++){
         double DC = 0;
         for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
-            DC += temp_rawSig_ch1[i][j];
+            DC += temp_rawSig_ch2[i][j];
         }
         DC /= (PRE_TRIGGER_SAMPLES-50);
         for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
-            temp_alignedSig[i][j] = temp_rawSig_ch1[i][j] - DC;
+            temp_alignedSig[i][j] = temp_rawSig_ch2[i][j] - DC;
         }
     }
     // Average the time domains along the record axis
@@ -143,8 +146,10 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     QVector< double > temp_sig_m2(RECORDS_PER_BUFFER);
     QVector< double > temp_sig_pa(RECORDS_PER_BUFFER);
     QVector< double > temp_sig_sc(RECORDS_PER_BUFFER);
+    QVector< double > temp_sig_gsc(RECORDS_PER_BUFFER);
     bool sig_sendEmit;
 
+    // MIRROR 1 EXTRACTION
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
             temp_sig_m1[i] += temp_rawSig_ch3[i][j];
@@ -152,39 +157,62 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
         temp_sig_m1[i] /= (PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
     }
 
+    // MIRROR 2 EXTRACTION
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
             temp_sig_m2[i] += temp_rawSig_ch4[i][j];
         }
         temp_sig_m2[i] /= (PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES);
     }
+
+    // NIR SCATTERING EXTRACTION
     //Only averaging pre-trigger because it avoids any corruption from PARS
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
-        for (int j = 0; j < PRE_TRIGGER_SAMPLES; j++){
+        for (int j = 0; j < 80; j++){
             temp_sig_sc[i] += temp_rawSig_ch2[i][j];
         }
-        temp_sig_sc[i] /= (PRE_TRIGGER_SAMPLES);
+        temp_sig_sc[i] /= (80);
     }
-    //Assuming step PARS extraction from channel
+
+    // PARS SIGNAL EXTRACTION
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         // Iterate over pre trigger region to extract DC
         double DC = 0;
         for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
-            DC += temp_rawSig_ch1[i][j];
+            DC += temp_rawSig_ch2[i][j];
         }
         DC /= (PRE_TRIGGER_SAMPLES-50);
 
         for (int j = 100;j < 180;j++){
-            temp_sig_pa[i] += temp_rawSig_ch1[i][j];
+            temp_sig_pa[i] += temp_rawSig_ch2[i][j];
         }
         temp_sig_pa[i] /= (80);
         temp_sig_pa[i] -= DC;
+        temp_sig_pa[i] /= DC;
+
     }
 
+    // GREEN SCATTERING EXTRACTION
+
+
+
+    for (int i = 0; i < RECORDS_PER_BUFFER; i++){
+        double gsc_DC = 0;
+        for (int j = 0; j < 80; j++){
+            gsc_DC += abs(temp_rawSig_ch1[i][j]);
+        }
+        gsc_DC /= 80;
+        for (int j = 100; j < 256; j++){
+            temp_sig_gsc[i] += abs(temp_rawSig_ch1[i][j]);
+        }
+        temp_sig_gsc[i] /= 156;
+        temp_sig_gsc[i] -= gsc_DC;
+    }
     {
         QMutexLocker locker(&sig_mutex);
         sig_pa = temp_sig_pa;
         sig_sc = temp_sig_sc;
+        sig_gsc = temp_sig_gsc;
         sig_m1 = temp_sig_m1;
         sig_m2 = temp_sig_m2;
         sig_sendEmit = !sig_flag;
