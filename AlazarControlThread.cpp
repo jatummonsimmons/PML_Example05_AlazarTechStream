@@ -20,7 +20,6 @@ AlazarControlThread :: ~AlazarControlThread()
 void AlazarControlThread::run()
 {
     //direct copy paste of NPT
-
     U32 systemId = 1;
     U32 boardId = 1;
 
@@ -231,7 +230,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     U32 channelMask = CHANNEL_A | CHANNEL_B | CHANNEL_C | CHANNEL_D;
 
     // TODO: Select if you wish to save the sample data to a file
-    BOOL saveData = false;
+//    BOOL saveData = false;
 
     // Calculate the number of enabled channels from the channel mask
     int channelCount = 0;
@@ -263,6 +262,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     // JATS CHANGE: Add in a saveBuffer which is specified as the number of buffers per acquisition * samples per buffer
 
     saveBuffer = new U16[bytesPerBuffer/2*buffersPerAcquisition];
+    waitTimeBuffer = new double[buffersPerAcquisition*2];
 
     // JATS CHANGE: Add in sendEmit flag to help GUI only receive emits when it is ready
     bool sendEmit = false;
@@ -271,15 +271,15 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     // Create a data file if required
     FILE *fpData = NULL;
 
-    if (saveData)
-    {
-        fpData = fopen("data.bin", "wb");
-        if (fpData == NULL)
-        {
-            printf("Error: Unable to create data file -- %u\n", GetLastError());
-            return FALSE;
-        }
-    }
+//    if (saveData)
+//    {
+//        fpData = fopen("data.bin", "wb");
+//        if (fpData == NULL)
+//        {
+//            printf("Error: Unable to create data file -- %u\n", GetLastError());
+//            return FALSE;
+//        }
+//    }
 
 
     // Allocate memory for DMA buffers
@@ -366,6 +366,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         U32 buffersCompleted = 0;
         U32 numSaveBuffers = 0;
         INT64 bytesTransferred = 0;
+        std::chrono::time_point<std::chrono::system_clock> start, end;
+        std::chrono::duration<double> startWait,endWait;
         while (running)
         {
             // TODO: Set a buffer timeout that is longer than the time
@@ -377,7 +379,15 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             bufferIndex = buffersCompleted % BUFFER_COUNT;
             U16 *pBuffer = BufferArray[bufferIndex];
 
+            //U64 startWait = GetTickCount64();
+            start = std::chrono::system_clock::now();
             retCode = AlazarWaitAsyncBufferComplete(boardHandle, pBuffer, timeout_ms);
+
+            //U64 endWait = GetTickCount64();
+            end = std::chrono::system_clock::now();
+
+            startWait = start.time_since_epoch();
+            endWait = end.time_since_epoch();
 
             if (retCode != ApiSuccess)
             {
@@ -391,6 +401,9 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 // JATS CHANGE: adding buffer completed                
                 U64 index = (numSaveBufferAtom%buffersPerAcquisition)*bytesPerBuffer/2;
                 memmove(&(saveBuffer[index]),pBuffer,bytesPerBuffer);
+
+                waitTimeBuffer[(numSaveBufferAtom%buffersPerAcquisition)*2+0] = startWait.count();
+                waitTimeBuffer[(numSaveBufferAtom%buffersPerAcquisition)*2+1] = endWait.count();
 
                 numSaveBufferAtom++;
                 sendEmitAtom = !flagAtom;
@@ -406,21 +419,30 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 
 
                 if (sendEmitAtom){
-                    //qDebug() << "Emit sent on buffer number" << buffersCompleted;
+                    //qDebug() << "Emit sent on buffer number" << numSaveBufferAtom;
                     emit dataReady(this);
+                }
+                else {
+                    //qDebug() << "No emit on buffer #" << numSaveBufferAtom;
                 }
 
                 if (saveData)
                 {
-                    // Write record to file
-                    size_t bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, fpData);
-                    if (bytesWritten != bytesPerBuffer)
-                    {
-                        qDebug() << "Error: Write buffer" << numSaveBufferAtom << "failed --" << GetLastError();
-                        success = FALSE;
+                    if (currentSaveCount < totalSaveCount){
+                        // Write record to file
+                        currentSaveCount++;
+                        size_t bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, continuousSaveFile);
+                        if (bytesWritten != bytesPerBuffer)
+                        {
+                            qDebug() << "Error: Write buffer" << numSaveBufferAtom << "failed --" << GetLastError();
+                            stopContinuousSave();
+                        }
+                        qDebug() << "Buffer number " << currentSaveCount << "saved successfully";
+                    }
+                    else {
+                        stopContinuousSave();
                     }
                 }
-
             }
 
             // Add the buffer to the end of the list of available buffers.
@@ -449,7 +471,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 
         // Display results
         double transferTime_sec = (GetTickCount() - startTickCount) / 1000.;
-        printf("Capture completed in %.2lf sec\n", transferTime_sec);
+        //printf("Capture completed in %.2lf sec\n", transferTime_sec);
 
         double buffersPerSec;
         double bytesPerSec;
@@ -469,9 +491,9 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             recordsPerSec = 0.;
         }
 
-        printf("Captured %u buffers (%.4g buffers per sec)\n", buffersCompleted, buffersPerSec);
-        printf("Captured %u records (%.4g records per sec)\n", recordsTransferred, recordsPerSec);
-        printf("Transferred %I64d bytes (%.4g bytes per sec)\n", bytesTransferred, bytesPerSec);
+//        printf("Captured %u buffers (%.4g buffers per sec)\n", buffersCompleted, buffersPerSec);
+//        printf("Captured %u records (%.4g records per sec)\n", recordsTransferred, recordsPerSec);
+//        printf("Transferred %I64d bytes (%.4g bytes per sec)\n", bytesTransferred, bytesPerSec);
 
     }
 
@@ -479,7 +501,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     retCode = AlazarAbortAsyncRead(boardHandle);
     if (retCode != ApiSuccess)
     {
-        printf("Error: AlazarAbortAsyncRead failed -- %s\n", AlazarErrorToText(retCode));
+//        printf("Error: AlazarAbortAsyncRead failed -- %s\n", AlazarErrorToText(retCode));
+        qDebug() << "Error: AlazarAbortAsyncRead failed -- " << AlazarErrorToText(retCode);
         success = FALSE;
     }
 
@@ -494,7 +517,6 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     }
 
     // Close the data file
-
     if (fpData != NULL)
         fclose(fpData);
 
@@ -543,11 +565,13 @@ void AlazarControlThread::readLatestData(QVector< QVector<double> > *ch1,
     //qDebug() << transferTime_sec;
 }
 
+// stopRunning function should set the running boolean to false to allow for a clean exit from the the alazartech control thread
 void AlazarControlThread::stopRunning()
 {
     running = false;
 }
 
+// InputRangeIdToVolts function taken from AlazarTech codebase to translate an input range id to a voltage doubdle
 double AlazarControlThread::InputRangeIdToVolts(U32 inputRangeId)
 {
     double inputRange_volts;
@@ -630,7 +654,17 @@ int AlazarControlThread::saveDataBuffer()
     FILE *fpData = NULL;
     size_t bytesWritten;
 
-    fpData = fopen("data.bin", "wb");
+    //find date and time and concatenate
+    time_t t = time(NULL);
+    struct tm buff;
+    localtime_s(&buff,&t);
+    char dateTime[100];
+    std::strftime(dateTime,sizeof(dateTime),"%Y-%m-%d-%H-%M-%S",&buff);
+    std::string fileName = SAVE_PATH;
+    fileName = fileName + dateTime + "-data.bin";
+
+    // open file
+    fpData = fopen(fileName.c_str(), "wb");
     if (fpData == NULL)
     {
         qDebug() << "Error: Unable to create data file --" << GetLastError();
@@ -661,16 +695,10 @@ int AlazarControlThread::saveDataBuffer()
         // we have an array with [[5] [2] [3] [4]]
         // buffersCompleted is 5, so 5%4 is 1
         // so first fwrite from buffersCompleted to end of file
-
-
-        bytesWritten = fwrite(&saveBuffer[(tempBuffersCompleted%BUFFERS_PER_ACQUISITION)],
+        bytesWritten = fwrite(&saveBuffer[(tempBuffersCompleted%BUFFERS_PER_ACQUISITION)*(bytesPerBuffer/2)],
                               sizeof(BYTE),
                               (BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer,
                               fpData);
-        qDebug() << "Writing first part: " << bytesWritten;
-        qDebug() << "tempBuffersCompleted%BUFFERS_PER_ACQUISITION" << tempBuffersCompleted%BUFFERS_PER_ACQUISITION;
-        qDebug() << "(BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer" << (BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer;
-
         if ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION) != 0){
             // if the buffer does not fit perfectly,
             // then fwrite from beginning of file to buffersCompleted
@@ -678,8 +706,6 @@ int AlazarControlThread::saveDataBuffer()
                                    sizeof(BYTE),
                                    ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*bytesPerBuffer,
                                    fpData);
-            qDebug() << "Writing second part: " << bytesWritten;
-            qDebug() << "((tempBuffersCompleted%BUFFERS_PER_ACQUISITION)-1)*bytesPerBuffer" << ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION)-1)*bytesPerBuffer;
         }
 
         // check if errored
@@ -696,14 +722,98 @@ int AlazarControlThread::saveDataBuffer()
     if (fpData != NULL)
         fclose(fpData);
 
+    /* COMMENT IN FOR TIME STAMPS
+    // Write the time stamp buffer
+    fpData = fopen("timeStamp.bin", "wb");
+    bytesWritten = 0;
+
+    if (tempBuffersCompleted < BUFFERS_PER_ACQUISITION){
+        bytesWritten = fwrite(waitTimeBuffer,sizeof(BYTE),tempBuffersCompleted*8*2,fpData);
+        if (bytesWritten != tempBuffersCompleted*8*2){
+            qDebug() << "Error: Write buffer failed --";
+            if (fpData != NULL)
+                fclose(fpData);
+            return 1;
+        }
+    }
+    else{
+        bytesWritten = fwrite(&waitTimeBuffer[(tempBuffersCompleted%BUFFERS_PER_ACQUISITION)*2],
+                                sizeof(BYTE),
+                                (BUFFERS_PER_ACQUISITION-(tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*8*2,
+                                fpData);
+        if ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION) != 0){
+            // if the buffer does not fit perfectly,
+            // then fwrite from beginning of file to buffersCompleted
+            bytesWritten += fwrite(waitTimeBuffer,
+                                   sizeof(BYTE),
+                                   ((tempBuffersCompleted%BUFFERS_PER_ACQUISITION))*8*2,
+                                   fpData);
+        }
+
+        if (bytesWritten != BUFFERS_PER_ACQUISITION*8*2){
+            qDebug() << "Error: Write buffer failed";
+            qDebug() << "Bytes written: " << bytesWritten << "does not equal" << BUFFERS_PER_ACQUISITION*bytesPerBuffer;
+            if (fpData != NULL)
+                fclose(fpData);
+            return 1;
+        }
+    }
+
+    // Close file
+    if (fpData != NULL)
+        fclose(fpData);
+    */
     // Unpause system
     pauseSaveBuffer = false;
     qDebug() << "File save finished successfully";
     return 0;
 }
 
+// startContinuousSave function should create a file handle, open it for writing, set the saveData flag to true
+// should double check that file is opened and if not call stopContinuousSave()
+// CHANGES: this should change to having an input passed which in some way defines the number of buffes to acquire
+void AlazarControlThread::startContinuousSave(int numBuffer)
+{
+    // initialize counters for saving
+    totalSaveCount = numBuffer;
+    currentSaveCount = 0;
+    continuousSaveFile = NULL;
 
+    // generate file name based on date and time
+    time_t t = time(NULL);
+    struct tm buff;
+    localtime_s(&buff,&t);
+    char dateTime[100];
+    std::strftime(dateTime,sizeof(dateTime),"%Y-%m-%d-%H-%M-%S",&buff);
+    std::string fileName = SAVE_PATH;
+    fileName = fileName + dateTime + "-data.bin";
 
+    // open file
+    continuousSaveFile = fopen(fileName.c_str(), "wb");
+    if (continuousSaveFile == NULL)
+    {
+        qDebug() << "Error: Unable to create data file --" << GetLastError();
+        stopContinuousSave();
+        return;
+    }
+
+    // enable writing to the file
+    saveData = true;
+    qDebug() << saveData;
+    return;
+}
+
+// stopContinouSave function should close the file handle, call signal to inform GUI file save finished
+// -- not clear on how to report to the front end whether the save was successful rn happening through console outputs
+void AlazarControlThread::stopContinuousSave()
+{
+    // check if the file was opened successfully and if so close it
+    saveData = false;
+    if (continuousSaveFile != NULL)
+        fclose(continuousSaveFile);
+    emit continuousSaveComplete();
+    return;
+}
 
 
 //#ifndef WIN32

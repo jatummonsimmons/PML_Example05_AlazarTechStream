@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <stdlib.h>
 #include <atomic>
+#include <chrono>
 
 #include "AlazarError.h"
 #include "AlazarApi.h"
@@ -58,9 +59,12 @@ public:
                         QVector< QVector<double> > *ch4);
     void stopRunning();
     int saveDataBuffer();
+    void startContinuousSave(int numBuffer);
+    void stopContinuousSave();
 
 signals:
     void dataReady(AlazarControlThread * dataThread);
+    void continuousSaveComplete();
 
 protected:
     void run() override;
@@ -84,10 +88,19 @@ private:
     std::atomic<bool> flagAtom;
 
     U16 * saveBuffer;
+    double * waitTimeBuffer;
+
     QMutex mutex;
     bool flag;
     bool running;
     bool pauseSaveBuffer;
+
+    // Declarations for continuous save operations including startContinuousSave() and stopContinuousSave()
+    bool saveData;
+    U32 currentSaveCount;
+    U32 totalSaveCount;
+    FILE *continuousSaveFile;
+
 };
 
 #endif // ALAZARCONTROLTHREAD_H

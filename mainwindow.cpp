@@ -68,17 +68,26 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&dataThread,&AlazarControlThread::dataReady,
             &processingThread, &dataProcessingThread::updateTimeDomains);
 
-//    connect(&processingThread,&dataProcessingThread::rawSig_ready,
-//            this,&MainWindow::updateTimeDomain);
-
+    // Initialize connections between processing thread and front end thread
     connect(&processingThread,&dataProcessingThread::avgSig_ready,
             this,&MainWindow::updateAvgSig);
 
     connect(&processingThread,&dataProcessingThread::sig_ready,
             this,&MainWindow::updateSig);
 
+    // Initialize connections between front end thread and dataThread
+    connect(&dataThread,&AlazarControlThread::continuousSaveComplete,
+            this,&MainWindow::continuousSaveComplete);
+
+    // Initialize lineEdit validator to ensure sensible entries
+    ui->lineEdit->setValidator( new QIntValidator(100, 10000, this) );
+    ui->lineEdit->setText("500");
+
+
     processingThread.start(QThread::NormalPriority);
-    dataThread.start(QThread::HighestPriority);
+    dataThread.start(QThread::TimeCriticalPriority);
+
+
 }
 
 MainWindow::~MainWindow()
@@ -200,7 +209,7 @@ void MainWindow::updateSig()
             img_pa[i][erase_line] = 0;
             img_gsc[i][erase_line] = 0;
         }
-        qDebug() << "(GUI) Erased line:" << erase_line;
+        //qDebug() << "(GUI) Erased line:" << erase_line;
 
         // find max / min of image
         double sc_max;
@@ -215,10 +224,10 @@ void MainWindow::updateSig()
                         first = false;
                     }
                     else {
-                        if (img_sc[i][j] < sc_min){
+                        if (img_sc[i][j]/img_count[i][j] < sc_min){
                             sc_min = img_sc[i][j]/img_count[i][j];
                         }
-                        if (img_sc[i][j] > sc_max){
+                        if (img_sc[i][j]/img_count[i][j] > sc_max){
                             sc_max = img_sc[i][j]/img_count[i][j];
                         }
                     }
@@ -238,10 +247,10 @@ void MainWindow::updateSig()
                         first = false;
                     }
                     else {
-                        if (img_gsc[i][j] < gsc_min){
+                        if (img_gsc[i][j]/img_count[i][j] < gsc_min){
                             gsc_min = img_gsc[i][j]/img_count[i][j];
                         }
-                        if (img_gsc[i][j] > gsc_max){
+                        if (img_gsc[i][j]/img_count[i][j] > gsc_max){
                             gsc_max = img_gsc[i][j]/img_count[i][j];
                         }
                     }
@@ -261,10 +270,10 @@ void MainWindow::updateSig()
                         first = false;
                     }
                     else {
-                        if (img_pa[i][j] < pa_min){
+                        if (img_pa[i][j]/img_count[i][j] < pa_min){
                             pa_min = img_pa[i][j]/img_count[i][j];
                         }
-                        if (img_pa[i][j] > pa_max){
+                        if (img_pa[i][j]/img_count[i][j] > pa_max){
                             pa_max = img_pa[i][j]/img_count[i][j];
                         }
                     }
@@ -275,11 +284,12 @@ void MainWindow::updateSig()
         colorMap_sc->setDataRange(QCPRange(sc_min,sc_max));
         colorMap_gsc->setDataRange(QCPRange(gsc_min,gsc_max));
 
+        double scale = 0.3;
         if (-pa_min > pa_max){
-            colorMap_pa->setDataRange(QCPRange(pa_min,-pa_min));
+            colorMap_pa->setDataRange(QCPRange(scale*pa_min,-scale*pa_min));
         }
         else{
-            colorMap_pa->setDataRange(QCPRange(pa_max,-pa_max));
+            colorMap_pa->setDataRange(QCPRange(-scale*pa_max,scale*pa_max));
         }
 
         ui->customPlot_img_sc->replot();
@@ -471,6 +481,8 @@ void MainWindow::setupSigVsMirrorPlot(QCustomPlot *customPlot)
 void MainWindow::on_pushButton_clicked()
 {
     ui->pushButton->setEnabled(false);
+    ui->pushButton_2->setEnabled(false);
+
     int success = dataThread.saveDataBuffer();
 
     ui->pushButton->setEnabled(true);
@@ -482,3 +494,33 @@ void MainWindow::on_pushButton_clicked()
     }
 }
 
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    ui->pushButton->setEnabled(false);
+    ui->pushButton_2->setEnabled(false);
+
+    QString numberOfBuffers = ui->lineEdit->text();
+    int numBuffer = numberOfBuffers.toInt();
+
+    if (numBuffer < 10){
+        numBuffer = 10;
+        ui->lineEdit->setText("10");
+        qDebug() << "Minimum number of buffers for saving is 10.";
+    }
+    if (numBuffer > 10000){
+        numBuffer = 10000;
+        ui->lineEdit->setText("10000");
+        qDebug() << "Maximum number of buffers for saving is 10000.";
+    }
+
+    qDebug() << numBuffer;
+    dataThread.startContinuousSave(numBuffer);
+}
+
+void MainWindow::continuousSaveComplete()
+{
+    ui->pushButton->setEnabled(true);
+    ui->pushButton_2->setEnabled(true);
+    qDebug() << "Continuous save completed (GUI)";
+}

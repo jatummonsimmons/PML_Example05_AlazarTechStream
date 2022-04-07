@@ -12,4 +12,7 @@
 #define NUM_PIXELS (250)
 #define MIRROR_VOLTAGE_RANGE_PM_V (0.2) // FOR PLOTTING PURPOSES ONLY
 
+// Save parameters
+#define SAVE_PATH ("C:\\Users\\Labadmin\\Documents\\JATS_TempDataFolder\\2022-04-07\\")
+
 #endif // ACQUISITIONCONFIG_H

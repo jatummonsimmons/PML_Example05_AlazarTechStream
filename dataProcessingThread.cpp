@@ -112,11 +112,11 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     for (int i =0; i < RECORDS_PER_BUFFER; i++){
         double DC = 0;
         for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
-            DC += temp_rawSig_ch2[i][j];
+            DC += temp_rawSig_ch1[i][j];
         }
         DC /= (PRE_TRIGGER_SAMPLES-50);
         for (int j = 0; j < PRE_TRIGGER_SAMPLES+POST_TRIGGER_SAMPLES; j++){
-            temp_alignedSig[i][j] = temp_rawSig_ch2[i][j] - DC;
+            temp_alignedSig[i][j] = temp_rawSig_ch1[i][j] - DC;
         }
     }
     // Average the time domains along the record axis
@@ -169,7 +169,7 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
     //Only averaging pre-trigger because it avoids any corruption from PARS
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         for (int j = 0; j < 80; j++){
-            temp_sig_sc[i] += temp_rawSig_ch2[i][j];
+            temp_sig_sc[i] += temp_rawSig_ch1[i][j];
         }
         temp_sig_sc[i] /= (80);
     }
@@ -179,35 +179,34 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
         // Iterate over pre trigger region to extract DC
         double DC = 0;
         for (int j = 0; j < PRE_TRIGGER_SAMPLES-50; j++){
-            DC += temp_rawSig_ch2[i][j];
+            DC += temp_rawSig_ch1[i][j];
         }
         DC /= (PRE_TRIGGER_SAMPLES-50);
 
-        for (int j = 100;j < 180;j++){
-            temp_sig_pa[i] += temp_rawSig_ch2[i][j];
+        for (int j = 90;j < 130;j++){
+            temp_sig_pa[i] += temp_rawSig_ch1[i][j];
         }
-        temp_sig_pa[i] /= (80);
+        temp_sig_pa[i] /= (40);
         temp_sig_pa[i] -= DC;
-        temp_sig_pa[i] /= DC;
+        // If desired can scattering compensate
+        //temp_sig_pa[i] /= DC;
 
     }
 
     // GREEN SCATTERING EXTRACTION
-
-
-
     for (int i = 0; i < RECORDS_PER_BUFFER; i++){
         double gsc_DC = 0;
         for (int j = 0; j < 80; j++){
-            gsc_DC += abs(temp_rawSig_ch1[i][j]);
+            gsc_DC += temp_rawSig_ch2[i][j];
         }
         gsc_DC /= 80;
-        for (int j = 100; j < 256; j++){
-            temp_sig_gsc[i] += abs(temp_rawSig_ch1[i][j]);
+        for (int j = 90; j < 120; j++){
+            temp_sig_gsc[i] += temp_rawSig_ch2[i][j];
         }
-        temp_sig_gsc[i] /= 156;
+        temp_sig_gsc[i] /= 30;
         temp_sig_gsc[i] -= gsc_DC;
     }
+
     {
         QMutexLocker locker(&sig_mutex);
         sig_pa = temp_sig_pa;

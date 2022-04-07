@@ -31,8 +31,10 @@ public:
 private slots:
     void updateAvgSig();
     void updateSig();
+    void continuousSaveComplete();
 
     void on_pushButton_clicked();
+    void on_pushButton_2_clicked();
 
 private:
     Ui::MainWindow *ui;
