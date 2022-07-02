@@ -13,8 +13,11 @@ AlazarControlThread :: AlazarControlThread(QObject *parent) :
 
 AlazarControlThread :: ~AlazarControlThread()
 {
+    qDebug() << "DTh: Destructor called...";
+    stopRunning();
     wait();
     delete [] saveBuffer;
+    qDebug() << "DTh: Destructor finished...";
 }
 
 void AlazarControlThread::run()
@@ -366,8 +369,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
         U32 buffersCompleted = 0;
         U32 numSaveBuffers = 0;
         INT64 bytesTransferred = 0;
+
         std::chrono::time_point<std::chrono::system_clock> start, end;
-        std::chrono::duration<double> startWait,endWait;
+        std::chrono::duration<double> startWait, endWait;
+
         while (running)
         {
             // TODO: Set a buffer timeout that is longer than the time
@@ -378,12 +383,8 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
             // to be filled by the board.
             bufferIndex = buffersCompleted % BUFFER_COUNT;
             U16 *pBuffer = BufferArray[bufferIndex];
-
-            //U64 startWait = GetTickCount64();
             start = std::chrono::system_clock::now();
             retCode = AlazarWaitAsyncBufferComplete(boardHandle, pBuffer, timeout_ms);
-
-            //U64 endWait = GetTickCount64();
             end = std::chrono::system_clock::now();
 
             startWait = start.time_since_epoch();
@@ -397,7 +398,6 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
 
             if (success && (!pauseSaveBuffer))
             {
-
                 // JATS CHANGE: adding buffer completed                
                 U64 index = (numSaveBufferAtom%buffersPerAcquisition)*bytesPerBuffer/2;
                 memmove(&(saveBuffer[index]),pBuffer,bytesPerBuffer);
@@ -431,7 +431,15 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                     if (currentSaveCount < totalSaveCount){
                         // Write record to file
                         currentSaveCount++;
-                        size_t bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, continuousSaveFile);
+                        size_t bytesWritten;
+                        if (fwrite != NULL){
+                            bytesWritten = fwrite(pBuffer, sizeof(BYTE), bytesPerBuffer, continuousSaveFile);
+                        }
+                        else {
+                            qDebug() << "File handle is null on trying to write before currentSaveCount < totalSaveCount";
+                            stopContinuousSave();
+                        }
+
                         if (bytesWritten != bytesPerBuffer)
                         {
                             qDebug() << "Error: Write buffer" << numSaveBufferAtom << "failed --" << GetLastError();
@@ -451,16 +459,16 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
                 retCode = AlazarPostAsyncBuffer(boardHandle, pBuffer, bytesPerBuffer);
                 if (retCode != ApiSuccess)
                 {
-                    //qDebug() << "Error: AlazarPostAsyncBuffer failed --" << AlazarErrorToText(retCode);
+                    qDebug() << "Error: AlazarPostAsyncBuffer failed --" << AlazarErrorToText(retCode);
                     success = FALSE;
                 }
             }
 
             // If the acquisition failed, exit the acquisition loop
-            if (!success)
-                //qDebug() << "Acquisition has failed. Exiting acquisition loop...";
+            if (!success){
+                qDebug() << "Acquisition has failed. Exiting acquisition loop...";
                 break;
-
+            }
             buffersCompleted++;
             bytesTransferred += bytesPerBuffer;
 
@@ -502,7 +510,7 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     if (retCode != ApiSuccess)
     {
 //        printf("Error: AlazarAbortAsyncRead failed -- %s\n", AlazarErrorToText(retCode));
-        qDebug() << "Error: AlazarAbortAsyncRead failed -- " << AlazarErrorToText(retCode);
+        //qDebug() << "Error: AlazarAbortAsyncRead failed -- " << AlazarErrorToText(retCode);
         success = FALSE;
     }
 
@@ -517,10 +525,10 @@ bool AlazarControlThread::AcquireData(HANDLE boardHandle)
     }
 
     // Close the data file
-    if (fpData != NULL)
-        fclose(fpData);
+//    if (fpData != NULL)
+//        fclose(fpData);
 
-
+    qDebug() << "DTh: Data acquisition run loop finished...";
     return success;
 }
 
@@ -571,7 +579,7 @@ void AlazarControlThread::stopRunning()
     running = false;
 }
 
-// InputRangeIdToVolts function taken from AlazarTech codebase to translate an input range id to a voltage doubdle
+// InputRangeIdToVolts function taken from AlazarTech codebase to translate an input range id to a voltage double
 double AlazarControlThread::InputRangeIdToVolts(U32 inputRangeId)
 {
     double inputRange_volts;

@@ -9,10 +9,10 @@
 
 // Processing parameters
 #define NUM_AVERAGE_SIGNALS (20)
-#define NUM_PIXELS (250)
+#define NUM_PIXELS (200)
 #define MIRROR_VOLTAGE_RANGE_PM_V (0.2) // FOR PLOTTING PURPOSES ONLY
 
 // Save parameters
-#define SAVE_PATH ("C:\\Users\\Labadmin\\Documents\\JATS_TempDataFolder\\2022-04-07\\")
+#define SAVE_PATH ("C:\\Users\\Labadmin\\Documents\\JATS_TempDataFolder\\")
 
 #endif // ACQUISITIONCONFIG_H

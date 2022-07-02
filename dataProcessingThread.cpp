@@ -22,7 +22,9 @@ dataProcessingThread::dataProcessingThread(QObject *parent) :
 
 dataProcessingThread::~dataProcessingThread()
 {
+    qDebug() << "PTh: Desctructor called...";
     wait();
+    qDebug() << "PTh: Desctructor finished...";
 }
 
 void dataProcessingThread::run()
@@ -200,10 +202,10 @@ void dataProcessingThread::updateTimeDomains(AlazarControlThread *dataThread)
             gsc_DC += temp_rawSig_ch2[i][j];
         }
         gsc_DC /= 80;
-        for (int j = 90; j < 120; j++){
+        for (int j = 90; j < 140; j++){
             temp_sig_gsc[i] += temp_rawSig_ch2[i][j];
         }
-        temp_sig_gsc[i] /= 30;
+        temp_sig_gsc[i] /= 50;
         temp_sig_gsc[i] -= gsc_DC;
     }
 

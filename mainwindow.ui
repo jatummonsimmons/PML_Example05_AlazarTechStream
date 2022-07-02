@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1920</width>
-    <height>1080</height>
+    <width>2560</width>
+    <height>1440</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,17 +18,17 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>10</y>
-      <width>651</width>
-      <height>201</height>
+      <y>760</y>
+      <width>801</width>
+      <height>621</height>
      </rect>
     </property>
    </widget>
    <widget class="QCustomPlot" name="customPlot_img_sc" native="true">
     <property name="geometry">
      <rect>
-      <x>1150</x>
-      <y>10</y>
+      <x>480</x>
+      <y>350</y>
       <width>451</width>
       <height>401</height>
      </rect>
@@ -37,8 +37,8 @@
    <widget class="QCustomPlot" name="customPlot_pa_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>220</y>
+      <x>830</x>
+      <y>760</y>
       <width>651</width>
       <height>201</height>
      </rect>
@@ -47,8 +47,8 @@
    <widget class="QCustomPlot" name="customPlot_sc_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>430</y>
+      <x>830</x>
+      <y>970</y>
       <width>651</width>
       <height>201</height>
      </rect>
@@ -57,8 +57,8 @@
    <widget class="QCustomPlot" name="customPlot_img_pa" native="true">
     <property name="geometry">
      <rect>
-      <x>680</x>
-      <y>10</y>
+      <x>10</x>
+      <y>350</y>
       <width>451</width>
       <height>401</height>
      </rect>
@@ -67,8 +67,8 @@
    <widget class="QCustomPlot" name="customPlot_gsc_m1" native="true">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>640</y>
+      <x>830</x>
+      <y>1180</y>
       <width>651</width>
       <height>201</height>
      </rect>
@@ -77,8 +77,8 @@
    <widget class="QCustomPlot" name="customPlot_img_gsc" native="true">
     <property name="geometry">
      <rect>
-      <x>1150</x>
-      <y>430</y>
+      <x>950</x>
+      <y>350</y>
       <width>451</width>
       <height>401</height>
      </rect>
@@ -87,10 +87,10 @@
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>1620</x>
-      <y>30</y>
-      <width>75</width>
-      <height>24</height>
+      <x>1550</x>
+      <y>60</y>
+      <width>171</width>
+      <height>61</height>
      </rect>
     </property>
     <property name="text">
@@ -100,10 +100,10 @@
    <widget class="QPushButton" name="pushButton_2">
     <property name="geometry">
      <rect>
-      <x>1620</x>
-      <y>70</y>
-      <width>111</width>
-      <height>24</height>
+      <x>1550</x>
+      <y>130</y>
+      <width>171</width>
+      <height>61</height>
      </rect>
     </property>
     <property name="text">
@@ -113,14 +113,109 @@
    <widget class="QLineEdit" name="lineEdit">
     <property name="geometry">
      <rect>
-      <x>1740</x>
-      <y>70</y>
-      <width>113</width>
-      <height>22</height>
+      <x>1730</x>
+      <y>130</y>
+      <width>131</width>
+      <height>61</height>
      </rect>
     </property>
     <property name="maxLength">
      <number>5</number>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_img_sc_gsc" native="true">
+    <property name="geometry">
+     <rect>
+      <x>1420</x>
+      <y>350</y>
+      <width>451</width>
+      <height>401</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="customPlot_sc_gsc" native="true">
+    <property name="geometry">
+     <rect>
+      <x>1500</x>
+      <y>760</y>
+      <width>801</width>
+      <height>621</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_3">
+    <property name="geometry">
+     <rect>
+      <x>1360</x>
+      <y>60</y>
+      <width>171</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Restart Data Thread</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_4">
+    <property name="geometry">
+     <rect>
+      <x>1550</x>
+      <y>200</y>
+      <width>171</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Update Mirror Range</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit_2">
+    <property name="geometry">
+     <rect>
+      <x>1730</x>
+      <y>200</y>
+      <width>131</width>
+      <height>61</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_5">
+    <property name="geometry">
+     <rect>
+      <x>1060</x>
+      <y>60</y>
+      <width>161</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Collect Background</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="checkBox">
+    <property name="geometry">
+     <rect>
+      <x>1070</x>
+      <y>140</y>
+      <width>151</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Subtract Background</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_6">
+    <property name="geometry">
+     <rect>
+      <x>1060</x>
+      <y>180</y>
+      <width>161</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Clear All Images</string>
     </property>
    </widget>
   </widget>
@@ -129,7 +224,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1920</width>
+     <width>2560</width>
      <height>22</height>
     </rect>
    </property>

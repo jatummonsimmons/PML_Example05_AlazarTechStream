@@ -44,7 +44,7 @@ inline int _kbhit (void);
 inline int GetLastError();
 #endif // ifndef _WIN32
 
-#define BUFFER_COUNT 4
+#define BUFFER_COUNT 8
 
 class AlazarControlThread : public QThread
 {
